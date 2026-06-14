@@ -1,0 +1,2627 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Isometric God of War — Survivors</title>
+<style>
+  :root{
+    --gold:#c9a227;
+    --frost:#7fd4ff;
+    --blood:#b1221c;
+    --bone:#e8dfc8;
+    --bg:#171209;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;user-select:none;}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Courier New',monospace;color:var(--bone);}
+  canvas{display:block;image-rendering:pixelated;}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;top:0;left:0;right:0;padding:10px 14px;display:none;pointer-events:none;z-index:5;}
+  .bar{position:relative;height:18px;border:2px solid #000;background:#1a1a1a;box-shadow:0 0 0 1px #555;overflow:hidden;}
+  .bar .fill{position:absolute;inset:0;transform-origin:left;transition:transform .15s linear;}
+  #hpbar{width:min(420px,55vw);margin-bottom:6px;}
+  #hpfill{background:linear-gradient(#d83a2e,#7e1410);}
+  #xpbar{width:min(420px,55vw);height:10px;}
+  #xpfill{background:linear-gradient(#ffe27a,var(--gold));}
+  #stats{position:fixed;top:10px;right:14px;text-align:right;font-size:14px;line-height:1.5;text-shadow:1px 1px 0 #000;}
+  #stats b{color:var(--gold);}
+  /* texto sobre la barra de vida: total y porcentaje */
+  #hptext{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;text-shadow:1px 1px 0 #000;letter-spacing:1px;z-index:3;font-weight:bold;}
+  /* nivel + tira de mejoras elegidas (debajo de la XP, arriba a la izquierda) */
+  #lvlleft{margin-top:6px;font-size:13px;letter-spacing:2px;color:var(--gold);text-shadow:1px 1px 0 #000;}
+  #upbar{margin-top:6px;display:flex;flex-direction:column;gap:4px;max-width:min(420px,55vw);
+         background:rgba(20,16,8,.55);border:1px solid #4a4030;padding:6px 8px;width:max-content;}
+  .uprow{display:flex;align-items:center;gap:7px;}
+  .uprow .ic{width:18px;text-align:center;font-size:14px;}
+  .dots{display:flex;gap:3px;}
+  .dot{width:8px;height:8px;border:1.5px solid #6b5e3a;background:#15110a;}
+  .dot.on{background:var(--gold);border-color:#ffe27a;box-shadow:0 0 5px rgba(201,162,39,.85);}
+  .uprow .num{font-size:11px;color:var(--bone);margin-left:2px;}
+  #weaponlog{position:fixed;left:50%;top:64px;transform:translateX(-50%);font-size:18px;color:var(--frost);text-shadow:1px 1px 0 #000;opacity:0;transition:opacity .4s;letter-spacing:1px;text-align:center;}
+  #bosslog{position:fixed;left:50%;top:96px;transform:translateX(-50%);font-size:16px;color:var(--blood);text-shadow:1px 1px 0 #000;opacity:0;transition:opacity .4s;letter-spacing:2px;}
+  /* cartel grande de transición de nivel */
+  #nextlevel{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+             background:rgba(8,10,16,.55);z-index:8;opacity:0;transition:opacity .5s;pointer-events:none;}
+  #nextlevel .big{font-size:clamp(34px,7vw,72px);letter-spacing:6px;color:#fff;text-shadow:0 0 24px rgba(127,212,255,.6),2px 2px 0 #000;}
+  #nextlevel .small{margin-top:14px;font-size:clamp(16px,2.4vw,24px);letter-spacing:4px;color:var(--gold);text-shadow:2px 2px 0 #000;}
+  #nextlevel.show{opacity:1;}
+
+  /* ---------- Pantallas ---------- */
+  .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,8,4,.93);z-index:10;overflow:auto;padding:20px;}
+  .hidden{display:none!important;}
+  h1{font-size:clamp(24px,4.6vw,48px);letter-spacing:4px;color:var(--bone);text-shadow:0 0 18px rgba(201,162,39,.45),2px 2px 0 #000;margin-bottom:6px;text-align:center;}
+  .sub{color:#9a8d6e;font-size:14px;letter-spacing:2px;margin-bottom:28px;text-align:center;}
+  .chars{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;max-width:1000px;}
+  .charcard{width:218px;border:2px solid #4a4030;background:#16110a;padding:14px 13px 12px;cursor:pointer;text-align:center;transition:transform .12s, border-color .12s, box-shadow .12s;}
+  .charcard:hover{transform:translateY(-4px);border-color:var(--gold);box-shadow:0 0 22px rgba(201,162,39,.25);}
+  .charcard canvas{margin:0 auto 8px;background:#0d0a05;border:1px solid #2e2718;}
+  .charcard h2{font-size:18px;letter-spacing:2px;margin-bottom:7px;}
+  .charcard p{font-size:10.5px;color:#a59a82;line-height:1.55;text-align:left;}
+  .hint{margin-top:26px;font-size:12px;color:#7c7158;letter-spacing:1px;text-align:center;}
+
+  /* ---------- Level up ---------- */
+  #levelup{background:rgba(10,8,4,.9);}
+  #levelup h1{color:var(--gold);}
+  .upgrades{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;max-width:980px;}
+  .upcard{width:190px;border:2px solid #4a4030;background:#16110a;padding:16px 14px;cursor:pointer;text-align:center;transition:transform .12s,border-color .12s;}
+  .upcard:hover{transform:translateY(-4px);border-color:var(--frost);}
+  .upcard .icon{font-size:32px;margin-bottom:8px;}
+  .upcard h3{font-size:14px;color:var(--bone);letter-spacing:1px;margin-bottom:6px;}
+  .upcard p{font-size:11.5px;color:#a59a82;line-height:1.5;}
+  .upcard .stack{margin-top:8px;font-size:11px;color:var(--gold);letter-spacing:1px;}
+
+  /* ---------- Game over ---------- */
+  #gameover h1{color:var(--blood);}
+  #finalstats{font-size:16px;line-height:2;text-align:center;margin-bottom:26px;}
+  .btn{pointer-events:auto;border:2px solid var(--gold);background:transparent;color:var(--gold);font-family:inherit;font-size:16px;letter-spacing:2px;padding:12px 34px;cursor:pointer;transition:background .12s,color .12s;}
+  .btn:hover{background:var(--gold);color:#000;}
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="bar" id="hpbar"><div class="fill" id="hpfill"></div><div id="hptext">100 / 100 · 100%</div></div>
+  <div class="bar" id="xpbar"><div class="fill" id="xpfill"></div></div>
+  <div id="lvlleft">NIVEL 1</div>
+  <div id="upbar"></div>
+</div>
+<div id="stats" style="display:none">
+  NIVEL <b id="lvltxt">1</b><br>
+  DERROTADOS <b id="killtxt">0</b><br>
+  TIEMPO <b id="timetxt">0:00</b>
+</div>
+<div id="weaponlog"></div>
+<div id="bosslog"></div>
+<div id="nextlevel"><div class="big">SIGUIENTE NIVEL</div><div class="small">EL OLIMPO</div></div>
+
+<!-- Selección de personaje -->
+<div class="screen" id="menu">
+  <h1>GOD OF WAR · SURVIVORS</h1>
+  <div class="sub">LAS RUINAS DE GRECIA TE ESPERAN — ELIGE TU GUERRERO</div>
+  <div class="chars" id="charlist"></div>
+  <div class="hint">MUÉVETE CON WASD / FLECHAS · LOS ATAQUES SON AUTOMÁTICOS<br>CADA MEJORA TIENE UN TOPE — SOLO LA VIDA ES INFINITA</div>
+</div>
+
+<!-- Subida de nivel -->
+<div class="screen hidden" id="levelup">
+  <h1>¡NIVEL <span id="luLvl">2</span>!</h1>
+  <div class="sub">ELIGE UNA BENDICIÓN</div>
+  <div class="upgrades" id="upgrades"></div>
+</div>
+
+<!-- Game over -->
+<div class="screen hidden" id="gameover">
+  <h1>HAS CAÍDO, GUERRERO</h1>
+  <div id="finalstats"></div>
+  <button class="btn" id="restartBtn">VOLVER AL CAMPO DE BATALLA</button>
+</div>
+
+<script>
+"use strict";
+/* =========================================================
+   ISOMETRIC GOD OF WAR — SURVIVORS  (v2)
+   4 héroes · 20+ habilidades · ruinas griegas · 9 enemigos
+   Un solo archivo. HTML5 Canvas, sin dependencias.
+   ========================================================= */
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
+addEventListener('resize', resize); resize();
+
+/* ---------------- Utilidades ---------------- */
+const rand   = (a,b)=> a + Math.random()*(b-a);
+const dist2  = (ax,ay,bx,by)=> (ax-bx)*(ax-bx)+(ay-by)*(ay-by);
+const clamp  = (v,a,b)=> v<a?a:(v>b?b:v);
+const hash2  = (x,y)=> { let h = (x*73856093) ^ (y*19349663); h = (h ^ (h>>13)) * 1274126177; return ((h ^ (h>>16)) >>> 0); };
+function mulberry(seed){ return function(){ seed|=0; seed = seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+/* Proyección isométrica */
+const isoX = (wx,wy)=> wx - wy;
+const isoY = (wx,wy)=> (wx + wy) * 0.5;
+
+/* ---------------- Paleta global ---------------- */
+const PAL = {
+  '.':null,
+  's':'#d9c4a0','S':'#bfa57f',           // piel
+  'a':'#e7e2d4','A':'#c4bca7',           // piel ceniza (Fantasma de Esparta)
+  'r':'#b1221c',                         // rojo tatuaje
+  'k':'#15161a',                         // ojos / oscuro
+  'b':'#6e6258',                         // barba
+  'g':'#8d949e',                         // metal
+  'p':'#5d4630','P':'#3f2f20',           // cuero
+  'h':'#7a4f2a',                         // pelo Atreus
+  't':'#4c7a3c','T':'#33572a',           // túnica verde
+  'l':'#d9b65a',                         // pelo Freya
+  'v':'#3f7d6a','V':'#2b574a',           // vestido vanir
+  'd':'#9aa0a6','D':'#6c7176',           // draugr
+  'o':'#ff9c2e',                         // ojos brillantes
+  'm':'#6e5b44','M':'#4d4030',           // harapos
+  'n':'#d9d2bd','N':'#9a9482',           // hueso
+  'B':'#7a5a2c',                         // bronce
+  'i':'#9fd4e8','I':'#5f93ad',           // hielo
+  'q':'#7a2030','Q':'#4d1420',           // túnica revenant
+  'e':'#7ba35c','E':'#54713f',           // gorgona
+  'f':'#6e4423','F':'#4a2d16',           // minotauro
+};
+
+/* ---------------- Sprites de héroes (torso 16x12, piernas procedurales) ---------------- */
+const SPR = {
+kratos_down:[
+"................",
+".....ssssss.....",
+"....ssssssss....",
+"....rrssssss....",
+"....rkssskss....",
+"....ssssssss....",
+".....sbbbbs.....",
+"....ssssssss....",
+"...ssrrssssss...",
+"...sSrrsssssS...",
+"...sSrrsssssS...",
+"....gssssssg....",
+],
+kratos_side:[
+"................",
+".....ssssss.....",
+"....ssssssss....",
+"....ssrrssss....",
+"....sssssks.....",
+"....ssssssss....",
+"......sbbbb.....",
+"....ssssssss....",
+"...ssssrrssss...",
+"...sSssrrsssS...",
+"...sSssrrsssS...",
+"....gssssssg....",
+],
+atreus_down:[
+"................",
+".....hhhhhh.....",
+"....hhhhhhhh....",
+"....hssssssh....",
+"....skssssks....",
+"....ssssssss....",
+".....ssssss.....",
+"....tttttttt....",
+"...tttttttttt...",
+"...tTttttttTt...",
+"...tTttttttTt...",
+"....pppppppp....",
+],
+atreus_side:[
+"................",
+".....hhhhhh.....",
+"....hhhhhhhh....",
+"....hhssssss....",
+"....hssssks.....",
+"....ssssssss....",
+"......ssss......",
+"....tttttttt....",
+"...tttttttttt...",
+"...tTtttpttTt...",
+"...tTttttttTt...",
+"....pppppppp....",
+],
+freya_down:[
+"................",
+".....llllll.....",
+"....llllllll....",
+"....lssssssl....",
+"....skssssks....",
+"....lssssssl....",
+".....ssssss.....",
+"....vvvvvvvv....",
+"...vvvVvvVvvv...",
+"...vvvvvvvvvv...",
+"...vvvvvvvvvv...",
+"....vvvvvvvv....",
+],
+freya_side:[
+"................",
+".....llllll.....",
+"....llllllll....",
+"....llssssss....",
+"....lssssks.....",
+"....lsssssss....",
+"......ssss......",
+"....vvvvvvvv....",
+"...vvvvvvvvvv...",
+"...vvVvvvvVvv...",
+"...vvvvvvvvvv...",
+"....vvvvvvvv....",
+],
+spartan_down:[
+"................",
+".....aaaaaa.....",
+"....aaaaaaaa....",
+"....rraaaaaa....",
+"....rkaaakaa....",
+"....aaaaaaaa....",
+".....abbbba.....",
+"....aaaaaaaa....",
+"...aarraaaaaa...",
+"...aArraaaaAa...",
+"...aArraaaaAa...",
+"....gaaaaaag....",
+],
+spartan_side:[
+"................",
+".....aaaaaa.....",
+"....aaaaaaaa....",
+"....aarraaaa....",
+"....aaaaaka.....",
+"....aaaaaaaa....",
+"......abbb......",
+"....aaaaaaaa....",
+"...aaaarraaaa...",
+"...aAaarraaAa...",
+"...aAaarraaAa...",
+"....gaaaaaag....",
+],
+};
+/* Vista de espaldas derivada (sin ojos / barba) */
+function backOf(rows, skin){
+  return rows.map(r=> r.replace(/k/g,skin).replace(/b/g,skin).replace(/r/g, skin==='a'?'a':skin));
+}
+SPR.kratos_up  = backOf(SPR.kratos_down,'s');
+SPR.atreus_up  = SPR.atreus_down.map(r=>r.replace(/k/g,'h').replace(/s/g,'h'));
+SPR.freya_up   = SPR.freya_down.map(r=>r.replace(/k/g,'l').replace(/s/g,'l'));
+SPR.spartan_up = backOf(SPR.spartan_down,'a');
+
+/* Figura sagrada con túnica (enemigos del Olimpo) 16x12 */
+SPR.robed = [
+"................",
+".....nnnnnn.....",
+"....nnnnnnnn....",
+"....nnnnnnnn....",
+"....nssssssn....",
+"....nsossosn....",
+".....nnnnnn.....",
+"....nnnnnnnn....",
+"...nnnnnnnnnn...",
+"...nBnnnnnnBn...",
+"...nnnnnnnnnn...",
+"...BBnnnnnnBB...",
+];
+
+/* Sprite base de enemigo humanoide (16x12) */
+const SPR_ENEMY = [
+"................",
+".....dddddd.....",
+"....dDddddDd....",
+"....doddddod....",
+"....dddddddd....",
+".....ddDDdd.....",
+"....mmmmmmmm....",
+"...mmDmmmmDmm...",
+"...mDmmmmmmDm...",
+"...mmmmmmmmmm...",
+"...mmmmmmmmmm...",
+"....mmmDDmmm....",
+];
+
+function drawSprite(c, rows, sx, sy, scale, flip, palOverride){
+  const w = 16;
+  for(let j=0;j<rows.length;j++){
+    const row = rows[j];
+    for(let i=0;i<w;i++){
+      const ch = flip ? row[w-1-i] : row[i];
+      let col = palOverride && palOverride[ch] !== undefined ? palOverride[ch] : PAL[ch];
+      if(!col) continue;
+      c.fillStyle = col;
+      c.fillRect(sx + i*scale, sy + j*scale, scale, scale);
+    }
+  }
+}
+
+/* Dibuja un actor: torso (sprite) + piernas animadas procedurales */
+function drawActor(c, rows, x, y, scale, flip, walkPhase, moving, legCol, footCol, palOverride){
+  const torsoH = rows.length; // 12
+  const top = y - (torsoH+4)*scale;
+  // piernas (2 unidades de alto + pie)
+  const swing = moving ? Math.sin(walkPhase)*1.6 : 0;
+  const lift  = moving ? Math.abs(Math.sin(walkPhase))*0.8 : 0;
+  const dir = flip ? -1 : 1;
+  c.fillStyle = legCol;
+  // pierna A
+  c.fillRect(x + (-3 + swing*dir)*scale, y - 4*scale - lift*scale, 3*scale, 3*scale);
+  // pierna B
+  c.fillRect(x + (1 - swing*dir)*scale, y - 4*scale - (moving?0.8-lift:0)*scale, 3*scale, 3*scale);
+  c.fillStyle = footCol;
+  c.fillRect(x + (-3 + swing*dir)*scale, y - 1.4*scale - lift*scale, 3*scale, 1.6*scale);
+  c.fillRect(x + (1 - swing*dir)*scale, y - 1.4*scale - (moving?0.8-lift:0)*scale, 3*scale, 1.6*scale);
+  // torso
+  const bob = moving ? Math.abs(Math.sin(walkPhase))*1.2*scale : Math.sin(walkPhase*0.4)*0.6*scale;
+  drawSprite(c, rows, x - 8*scale, top - bob, scale, flip, palOverride);
+}
+
+/* =========================================================
+   PERSONAJES Y ARMAS
+   ========================================================= */
+const CHARS = {
+  kratos:{
+    name:'KRATOS', color:'#b1221c', spr:'kratos', leg:'#5d4630', foot:'#15161a',
+    desc:['Nv.1 — Puños espartanos','Nv.2 — Hacha Leviatán','Nv.5 — Espadas del Caos','Nv.8 — Escudo Guardián','Nv.10 — Golpe de Escarcha','Nv.14 — Ira de Esparta'],
+    weapons:[
+      {lvl:1,  id:'punch',     nom:'PUÑOS ESPARTANOS'},
+      {lvl:2,  id:'axe',       nom:'HACHA LEVIATÁN'},
+      {lvl:5,  id:'blades',    nom:'ESPADAS DEL CAOS'},
+      {lvl:8,  id:'shield',    nom:'ESCUDO GUARDIÁN'},
+      {lvl:10, id:'frost',     nom:'GOLPE DE ESCARCHA'},
+      {lvl:14, id:'rage',      nom:'IRA DE ESPARTA'},
+    ],
+  },
+  atreus:{
+    name:'ATREUS', color:'#7bbf5e', spr:'atreus', leg:'#5d4630', foot:'#15161a',
+    desc:['Nv.1 — Arco de Garra','Nv.3 — Flechas de Luz','Nv.5 — Invocación del Lobo','Nv.8 — Lluvia de Flechas','Nv.10 — Tormenta de Pájaros','Nv.14 — Colmillos de Fenrir'],
+    weapons:[
+      {lvl:1,  id:'bow',       nom:'ARCO DE GARRA'},
+      {lvl:3,  id:'lightarrows',nom:'FLECHAS DE LUZ'},
+      {lvl:5,  id:'wolf',      nom:'INVOCACIÓN DEL LOBO'},
+      {lvl:8,  id:'rain',      nom:'LLUVIA DE FLECHAS'},
+      {lvl:10, id:'birds',     nom:'TORMENTA DE PÁJAROS'},
+      {lvl:14, id:'fenrir',    nom:'COLMILLOS DE FENRIR'},
+    ],
+  },
+  freya:{
+    name:'FREYA', color:'#5fae8f', spr:'freya', leg:'#2b574a', foot:'#15161a',
+    desc:['Nv.1 — Proyectil Vanir','Nv.3 — Raíces de Vanaheim','Nv.5 — Espada Mardöll','Nv.8 — Alas de Valquiria','Nv.10 — Tormenta Vanir','Nv.14 — Bendición de Freya'],
+    weapons:[
+      {lvl:1,  id:'bolt',      nom:'PROYECTIL VANIR'},
+      {lvl:3,  id:'roots',     nom:'RAÍCES DE VANAHEIM'},
+      {lvl:5,  id:'mardoll',   nom:'ESPADA MARDÖLL'},
+      {lvl:8,  id:'feathers',  nom:'ALAS DE VALQUIRIA'},
+      {lvl:10, id:'storm',     nom:'TORMENTA VANIR'},
+      {lvl:14, id:'blessing',  nom:'BENDICIÓN DE FREYA'},
+    ],
+  },
+  spartan:{
+    name:'FANTASMA DE ESPARTA', color:'#e7e2d4', spr:'spartan', leg:'#7a2030', foot:'#15161a',
+    desc:['Nv.1 — Espadas de Atenea','Nv.3 — Arco de Apolo','Nv.5 — Furia de Poseidón','Nv.8 — Vellocino Dorado','Nv.10 — Ejército de Hades','Nv.14 — Ira de los Dioses'],
+    weapons:[
+      {lvl:1,  id:'athena',    nom:'ESPADAS DE ATENEA'},
+      {lvl:3,  id:'apollo',    nom:'ARCO DE APOLO'},
+      {lvl:5,  id:'poseidon',  nom:'FURIA DE POSEIDÓN'},
+      {lvl:8,  id:'fleece',    nom:'VELLOCINO DORADO'},
+      {lvl:10, id:'hades',     nom:'EJÉRCITO DE HADES'},
+      {lvl:14, id:'godrage',   nom:'IRA DE LOS DIOSES'},
+    ],
+  },
+};
+
+/* =========================================================
+   ESTADO GLOBAL
+   ========================================================= */
+const G = {
+  state:'menu', time:0, kills:0,
+  player:null, enemies:[], orbs:[], projectiles:[], effects:[], dmgTexts:[], particles:[],
+  wolf:null, birds:[], items:[],
+  spawnTimer:0, bossTimer:75, shake:0,
+  itemTimer:8, vacuum:0,        // aparición de items + imán (Cuerno de Amaltea)
+  olympusStart:0,               // momento (G.time) en que entramos al Olimpo (para el escalado)
+  /* progresión de nivel/escenario */
+  realm:'grecia',        // 'grecia' (nivel 1) | 'olimpo' (nivel 2)
+  bossActive:false,      // true mientras peleamos contra Zeus
+  bossDone:false,        // true cuando Zeus ya fue derrotado
+  transition:0, swapped:false,  // temporizador del cartel "SIGUIENTE NIVEL"
+};
+
+const keys = {};
+addEventListener('keydown', e=>{ const k=e.key.toLowerCase(); keys[k]=true; if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault(); });
+addEventListener('keyup',   e=>{ keys[e.key.toLowerCase()]=false; });
+
+function newPlayer(hero){
+  return {
+    hero, wx:0, wy:0, r:20,
+    hp:100, maxHp:100,
+    speed:195,
+    dir:'down', flip:false,
+    moving:false, walkPhase:0, anim:0,
+    level:1, xp:0, xpNeed:6,
+    /* mejoras con tope (la vida es infinita) */
+    up:{dmg:0, area:0, spd:0, cd:0, vida:0, pickup:0},
+    dmgMul:1, areaMul:1, speedMul:1, cdMul:1, armor:1, pickupMul:1,
+    regen:0, chill:0, hitFlash:0,
+    cd:{}, axeOut:false,
+    rageT:0, rageCd:0,
+  };
+}
+
+/* ---------------- Inicio / reinicio ---------------- */
+function startGame(hero){
+  G.state='playing'; G.time=0; G.kills=0;
+  G.enemies.length=0; G.orbs.length=0; G.projectiles.length=0;
+  G.effects.length=0; G.dmgTexts.length=0; G.particles.length=0; G.birds.length=0;
+  G.wolf=null; G.spawnTimer=0; G.bossTimer=75; G.shake=0;
+  G.items.length=0; G.itemTimer=8; G.vacuum=0; G.olympusStart=0;
+  G.realm='grecia'; G.bossActive=false; G.bossDone=false; G.transition=0; G.swapped=false;
+  pillarCache.clear();                      // regenera columnas de Grecia
+  hideNextLevel();
+  G.player = newPlayer(hero);
+  document.getElementById('menu').classList.add('hidden');
+  document.getElementById('gameover').classList.add('hidden');
+  document.getElementById('hud').style.display='block';
+  document.getElementById('stats').style.display='block';
+  renderUpgradeStrip();                      // tira de mejoras vacía al empezar
+  logWeapon(CHARS[hero].weapons[0].nom);
+}
+document.getElementById('restartBtn').onclick = ()=>{
+  document.getElementById('gameover').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
+  document.getElementById('hud').style.display='none';
+  document.getElementById('stats').style.display='none';
+  G.state='menu';
+};
+
+let logTimer=null;
+function logWeapon(txt){
+  const el = document.getElementById('weaponlog');
+  el.textContent = '✦ ' + txt + ' ✦';
+  el.style.opacity = 1;
+  clearTimeout(logTimer);
+  logTimer = setTimeout(()=> el.style.opacity = 0, 2600);
+}
+let bossLogTimer=null;
+function logBoss(txt){
+  const el = document.getElementById('bosslog');
+  el.textContent = '⚠ ' + txt + ' ⚠';
+  el.style.opacity = 1;
+  clearTimeout(bossLogTimer);
+  bossLogTimer = setTimeout(()=> el.style.opacity = 0, 3500);
+}
+
+/* ---------------- Menú de personajes ---------------- */
+(function buildMenu(){
+  const list = document.getElementById('charlist');
+  for(const key in CHARS){
+    const c = CHARS[key];
+    const card = document.createElement('div');
+    card.className='charcard';
+    const cv = document.createElement('canvas');
+    cv.width=96; cv.height=96;
+    card.appendChild(cv);
+    const h2 = document.createElement('h2');
+    h2.textContent = c.name; h2.style.color = c.color;
+    card.appendChild(h2);
+    const p = document.createElement('p');
+    p.innerHTML = c.desc.join('<br>');
+    card.appendChild(p);
+    card.onclick = ()=> startGame(key);
+    list.appendChild(card);
+    const pc = cv.getContext('2d');
+    pc.imageSmoothingEnabled = false;
+    drawActor(pc, SPR[c.spr+'_down'], 48, 88, 5, false, 0, false, c.leg, c.foot);
+  }
+})();
+
+/* =========================================================
+   ENEMIGOS — bestiario GoW 2018 + trilogía griega
+   ========================================================= */
+const ETYPES = {
+  draugr:    { hp:18,  spd:[55,85],  dmg:13, r:19, sc:3.2, xp:1, pal:null },
+  nightmare: { hp:9,   spd:[115,150],dmg:9,  r:13, sc:0,   xp:1, custom:'eye' },
+  legion:    { hp:36,  spd:[45,62],  dmg:15, r:20, sc:3.4, xp:2, pal:{d:'#d9d2bd',D:'#9a9482',m:'#7a5a2c',M:'#5a3f1c',o:'#15161a'}, shield:true },
+  gorgona:   { hp:30,  spd:[55,72],  dmg:14, r:19, sc:3.4, xp:2, pal:{d:'#9cc27a',D:'#6f9152',m:'#54713f',M:'#3c5230',o:'#ffe27a'}, snakes:true, petrify:true },
+  revenant:  { hp:26,  spd:[58,75],  dmg:14, r:18, sc:3.3, xp:2, pal:{d:'#c9bdb2',D:'#998d83',m:'#7a2030',M:'#4d1420',o:'#ff5050'}, teleport:true },
+  hel:       { hp:58,  spd:[38,52],  dmg:17, r:21, sc:3.7, xp:3, pal:{d:'#9fd4e8',D:'#5f93ad',m:'#3f6e85',M:'#2b4d5e',o:'#cfeeff'}, chill:true },
+  minotauro: { hp:85,  spd:[46,55],  dmg:22, r:24, sc:4.4, xp:4, pal:{d:'#a06a3a',D:'#6e4423',m:'#4a2d16',M:'#33200f',o:'#ff7a2e'}, horns:true, charger:true },
+  troll:     { hp:260, spd:[32,40],  dmg:28, r:32, sc:0,   xp:8, custom:'troll', elite:true },
+  ciclope:   { hp:950, spd:[40,46],  dmg:36, r:40, sc:0,   xp:22, custom:'ciclope', boss:true },
+  zeus:      { hp:7200, spd:[60,60], dmg:30, r:30, sc:0,   xp:40, custom:'zeus', boss:true },
+  /* --- enemigos sagrados del Olimpo (nivel 2) --- */
+  acolito:   { hp:34, spd:[58,76], dmg:12, r:18, sc:3.2, xp:2, spr:'robed',
+               pal:{n:'#f0ece0',N:'#cfcabf',s:'#e3c4a0',o:'#ffe27a',B:'#caa11f',M:'#cfcabf',k:'#15161a'} },
+  centinela: { hp:80, spd:[40,54], dmg:18, r:20, sc:3.6, xp:3, spr:'robed', elite:true,
+               pal:{n:'#eef0ee',N:'#c7cfd6',s:'#e3c4a0',o:'#ffd23f',B:'#d4af37',M:'#c7cfd6',k:'#15161a'} },
+  alado:     { hp:150, spd:[70,95], dmg:14, r:20, sc:0, xp:6, custom:'alado', ranged:true, elite:true },
+};
+
+function spawnTable(t){
+  if(G.realm==='olimpo'){
+    // enemigos sagrados del Olimpo (totalmente distintos a los de Grecia)
+    const tab = [['acolito', 10], ['centinela', 4]];
+    if(t>15) tab.push(['alado', 2]);   // el alado es el enemigo especial del nivel
+    return tab;
+  }
+  const tab = [['draugr', 10]];
+  if(t>30)  tab.push(['nightmare',4],['legion',4]);
+  if(t>90)  tab.push(['gorgona',3],['revenant',3]);
+  if(t>160) tab.push(['hel',3]);
+  if(t>220) tab.push(['minotauro',2]);
+  if(t>120) tab.push(['troll', Math.min(2, t/300)]);
+  return tab;
+}
+
+function pickType(t){
+  const tab = spawnTable(t);
+  let total=0; for(const e of tab) total+=e[1];
+  let roll = Math.random()*total;
+  for(const e of tab){ roll-=e[1]; if(roll<=0) return e[0]; }
+  return 'draugr';
+}
+
+function spawnEnemy(forceType){
+  const p = G.player;
+  const ang = Math.random()*Math.PI*2;
+  const R = Math.max(canvas.width, canvas.height) * 0.72 + 90;
+  const sx = Math.cos(ang)*R, sy = Math.sin(ang)*R;
+  const wx = p.wx + (sy + sx/2);
+  const wy = p.wy + (sy - sx/2);
+  // tiempo de escalado relativo: en el Olimpo cuenta desde que entramos
+  const tScale = (G.realm==='olimpo') ? Math.max(0, G.time - G.olympusStart) : G.time;
+  const type = forceType || pickType(tScale);
+  const T = ETYPES[type];
+  const t = tScale;
+  // escalado más suave: los números máximos crecen menos
+  const hpMul  = 1 + t/55 + Math.pow(t/80,2)*0.18;
+  const dmgMul = 1 + t/240;
+  // Zeus usa vida fija (pelea de jefe justa, sin inflar por el tiempo)
+  const hp = T.boss && T.custom==='zeus' ? T.hp : T.hp * hpMul;
+  G.enemies.push({
+    type, T, wx, wy,
+    r:T.r, hp, maxHp:hp,
+    speed: rand(T.spd[0],T.spd[1]),
+    dmg: T.dmg * dmgMul,
+    slow:0, stun:0, burn:0, burnDps:0, hitFlash:0,
+    anim:Math.random()*10, spawnT:0.3,
+    tpT: T.teleport ? rand(2,4) : 0,
+    chT: T.charger ? rand(2,4) : 0, charging:0, cvx:0, cvy:0,
+    shootT: T.custom==='alado' ? rand(1.2,2.2) : 0,   // temporizador de lanzas del alado
+  });
+  if(T.custom==='zeus') logBoss('¡ZEUS, REY DEL OLIMPO, DESCIENDE!');
+  else if(T.boss) logBoss('¡UN CÍCLOPE EMERGE DE LAS RUINAS!');
+  else if(T.elite && G.realm==='grecia' && Math.random()<0.5) logBoss('UN TROLL SE ACERCA');
+}
+
+function killEnemy(e, idx){
+  G.kills++;
+  G.enemies.splice(idx,1);
+  // sangre / polvo
+  for(let i=0;i<8;i++){
+    G.particles.push({wx:e.wx+rand(-8,8), wy:e.wy+rand(-8,8), vx:rand(-60,60), vy:rand(-60,60), life:rand(0.3,0.7), color: e.T.boss||e.T.elite ? '#8c1d18' : '#6e1410', size:rand(2,5)});
+  }
+  const n = e.T.xp;
+  for(let i=0;i<Math.min(n,6);i++){
+    G.orbs.push({ wx:e.wx+rand(-16,16), wy:e.wy+rand(-16,16), val: Math.ceil(n/Math.min(n,6)), t:0 });
+  }
+}
+
+function damageEnemy(e, amount, color){
+  if(e.invuln){ e.hitFlash = 0.05; return; }   // Zeus invulnerable en la tormenta
+  e.hp -= amount;
+  e.hitFlash = 0.1;
+  if(G.dmgTexts.length < 60)
+    G.dmgTexts.push({ wx:e.wx, wy:e.wy, txt:Math.round(amount), life:0.7, color:color||'#fff', rise:0 });
+}
+
+function nearestEnemy(maxDist, fromX, fromY){
+  const p = G.player;
+  const x = fromX===undefined ? p.wx : fromX;
+  const y = fromY===undefined ? p.wy : fromY;
+  let best=null, bd = maxDist*maxDist;
+  for(const e of G.enemies){
+    const d = dist2(x,y,e.wx,e.wy);
+    if(d < bd){ bd=d; best=e; }
+  }
+  return best;
+}
+function randomEnemiesOnScreen(n){
+  const out=[];
+  const pool = G.enemies.filter(e=> dist2(e.wx,e.wy,G.player.wx,G.player.wy) < 700*700);
+  while(out.length<n && pool.length){
+    out.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
+  }
+  return out;
+}
+
+/* =========================================================
+   ARMAS — registro genérico
+   ========================================================= */
+function totalDmg(p, base){ return base * p.dmgMul * (p.rageT>0 ? 1.8 : 1); }
+
+const WEAPONS = {
+  /* ---- KRATOS ---- */
+  punch:{ cd:0.45, fire(p){
+    const t = nearestEnemy(95*p.areaMul);
+    if(!t) return false;
+    faceTarget(p,t);
+    damageEnemy(t, totalDmg(p,12), '#fff');
+    const ang = screenAng(p,t);
+    G.effects.push({type:'punch', ang, life:0.14, max:0.14});
+    p.lunge = 0.1;
+    return true;
+  }},
+  axe:{ cd:1.0, fire(p){
+    if(p.axeOut) return false;
+    const close = nearestEnemy(115*p.areaMul);
+    const far   = nearestEnemy(620);
+    if(close){
+      faceTarget(p,close);
+      const ang = screenAng(p,close);
+      G.effects.push({type:'axeswing', ang, life:0.22, max:0.22});
+      for(const e of G.enemies)
+        if(dist2(p.wx,p.wy,e.wx,e.wy) < Math.pow(135*p.areaMul,2))
+          damageEnemy(e, totalDmg(p,24), '#cfe6ff');
+      p.lunge = 0.12;
+      return true;
+    } else if(far){
+      p.axeOut = true;
+      const dx=far.wx-p.wx, dy=far.wy-p.wy, L=Math.hypot(dx,dy)||1;
+      faceTarget(p,far);
+      G.projectiles.push({type:'axe', wx:p.wx, wy:p.wy, vx:dx/L*430, vy:dy/L*430,
+        phase:'out', spin:0, range:Math.min(L+60,520), traveled:0, hitSet:new Set()});
+      return true;
+    }
+    return false;
+  }},
+  blades:{ cd:2.8, fire(p){
+    G.effects.push({type:'blades', life:0.85, max:0.85, hitSet:new Set()});
+    return true;
+  }},
+  shield:{ cd:6, passive(p){ p.armor = Math.min(p.armor, 0.8); }, fire(p){
+    if(!nearestEnemy(170*p.areaMul)) return false;
+    G.effects.push({type:'shieldwave', life:0.4, max:0.4, color:'#cfd6dd'});
+    for(const e of G.enemies){
+      const d = Math.sqrt(dist2(p.wx,p.wy,e.wx,e.wy));
+      if(d < 160*p.areaMul){
+        damageEnemy(e, totalDmg(p,12), '#cfd6dd');
+        e.stun = Math.max(e.stun, 1.0);
+        const L=d||1;
+        e.wx += (e.wx-p.wx)/L*90; e.wy += (e.wy-p.wy)/L*90;
+      }
+    }
+    G.shake = Math.max(G.shake, 0.18);
+    return true;
+  }},
+  frost:{ cd:5, fire(p){
+    G.effects.push({type:'frost', life:1.1, max:1.1, hitSet:new Set()});
+    G.shake = 0.35;
+    return true;
+  }},
+  rage:{ cd:14, fire(p){
+    p.rageT = 4;
+    G.effects.push({type:'ragepulse', life:0.5, max:0.5});
+    logWeapon('¡IRA DE ESPARTA!');
+    return true;
+  }, tick(p,dt){
+    if(p.rageT>0){
+      p.rageT -= dt;
+      // aura de contacto
+      for(const e of G.enemies)
+        if(dist2(p.wx,p.wy,e.wx,e.wy) < 75*75)
+          damageEnemy(e, 26*p.dmgMul*dt, '#ff5040');
+    }
+  }},
+
+  /* ---- ATREUS ---- */
+  bow:{ cd:0.4, fire(p){
+    const t = nearestEnemy(560);
+    if(!t) return false;
+    faceTarget(p,t);
+    const dx=t.wx-p.wx, dy=t.wy-p.wy, L=Math.hypot(dx,dy)||1;
+    G.projectiles.push({type:'arrow', wx:p.wx, wy:p.wy, vx:dx/L*540, vy:dy/L*540, t:0, life:1.3, dmg:totalDmg(p,18), col:'#9fe06c'});
+    return true;
+  }},
+  lightarrows:{ cd:3.5, fire(p){
+    const t = nearestEnemy(560);
+    if(!t) return false;
+    const base = Math.atan2(t.wy-p.wy, t.wx-p.wx);
+    for(let i=-2;i<=2;i++){
+      const a = base + i*0.18;
+      G.projectiles.push({type:'parrow', wx:p.wx, wy:p.wy, vx:Math.cos(a)*500, vy:Math.sin(a)*500,
+        t:0, life:1.1, dmg:totalDmg(p,13), hitSet:new Set(), col:'#ffe27a'});
+    }
+    return true;
+  }},
+  wolf:{ persistent(p){
+    if(!G.wolf) G.wolf = { wx:p.wx-50, wy:p.wy-50, target:null, tAtk:0, anim:0 };
+  }},
+  rain:{ cd:7, fire(p){
+    const t = nearestEnemy(500);
+    if(!t) return false;
+    G.effects.push({type:'rain', wx:t.wx, wy:t.wy, R:130*p.areaMul, life:1.3, max:1.3, tick:0, dmg:totalDmg(p,12)});
+    return true;
+  }},
+  birds:{ persistent(p){
+    if(G.birds.length===0)
+      for(let i=0;i<4;i++) G.birds.push({ ang:i*(Math.PI/2), tHit:new Map(), wx:p.wx, wy:p.wy });
+  }},
+  fenrir:{ cd:12, fire(p){
+    const t = nearestEnemy(650);
+    if(!t) return false;
+    const dx=t.wx-p.wx, dy=t.wy-p.wy, L=Math.hypot(dx,dy)||1;
+    G.projectiles.push({type:'fenrir', wx:p.wx, wy:p.wy, vx:dx/L*640, vy:dy/L*640,
+      t:0, life:1.4, dmg:totalDmg(p,45), hitSet:new Set(), anim:0});
+    G.shake = 0.25;
+    logWeapon('¡FENRIR ATACA!');
+    return true;
+  }},
+
+  /* ---- FREYA ---- */
+  bolt:{ cd:0.55, fire(p){
+    const t = nearestEnemy(520);
+    if(!t) return false;
+    faceTarget(p,t);
+    G.projectiles.push({type:'bolt', wx:p.wx, wy:p.wy, vx:0, vy:0, t:0, life:2, dmg:totalDmg(p,19)});
+    return true;
+  }},
+  roots:{ cd:5, fire(p){
+    if(!nearestEnemy(200*p.areaMul)) return false;
+    G.effects.push({type:'roots', life:0.9, max:0.9});
+    for(const e of G.enemies){
+      if(dist2(p.wx,p.wy,e.wx,e.wy) < Math.pow(170*p.areaMul,2)){
+        damageEnemy(e, totalDmg(p,11), '#9cc27a');
+        e.stun = Math.max(e.stun, 1.5);
+      }
+    }
+    return true;
+  }},
+  mardoll:{ cd:1.6, fire(p){
+    const t = nearestEnemy(150*p.areaMul);
+    if(!t) return false;
+    faceTarget(p,t);
+    const base = Math.atan2(t.wy-p.wy, t.wx-p.wx);
+    for(const e of G.enemies){
+      const d = Math.sqrt(dist2(p.wx,p.wy,e.wx,e.wy));
+      if(d < 160*p.areaMul){
+        const a = Math.atan2(e.wy-p.wy, e.wx-p.wx);
+        let diff = Math.abs(a-base); if(diff>Math.PI) diff = Math.PI*2-diff;
+        if(diff < 0.85) damageEnemy(e, totalDmg(p,28), '#bfe8ff');
+      }
+    }
+    G.effects.push({type:'slash', ang:screenAng(p,t), life:0.2, max:0.2});
+    p.lunge = 0.1;
+    return true;
+  }},
+  feathers:{ cd:8, passive(p){ p.featherSpd = true; }, fire(p){
+    if(!nearestEnemy(260)) return false;
+    for(let i=0;i<12;i++){
+      const a = i/12*Math.PI*2;
+      G.projectiles.push({type:'feather', wx:p.wx, wy:p.wy, vx:Math.cos(a)*380, vy:Math.sin(a)*380,
+        t:0, life:0.7, dmg:totalDmg(p,14), hitSet:new Set()});
+    }
+    G.effects.push({type:'shieldwave', life:0.35, max:0.35, color:'#d9f2e8'});
+    return true;
+  }},
+  storm:{ cd:6, fire(p){
+    const targets = randomEnemiesOnScreen(5);
+    if(!targets.length) return false;
+    for(const e of targets){
+      damageEnemy(e, totalDmg(p,30), '#8fe89a');
+      e.slow = Math.max(e.slow, 0.8);
+      G.effects.push({type:'lightning', wx:e.wx, wy:e.wy, life:0.3, max:0.3, col:'#8fe89a'});
+    }
+    G.shake = Math.max(G.shake, 0.12);
+    return true;
+  }},
+  blessing:{ passive(p){ p.regen = Math.max(p.regen, 2.5); } },
+
+  /* ---- FANTASMA DE ESPARTA ---- */
+  athena:{ cd:1.0, fire(p){
+    const t = nearestEnemy(120*p.areaMul);
+    if(!t) return false;
+    for(const e of G.enemies)
+      if(dist2(p.wx,p.wy,e.wx,e.wy) < Math.pow(118*p.areaMul,2))
+        damageEnemy(e, totalDmg(p,19), '#ffb14a');
+    G.effects.push({type:'spin', life:0.25, max:0.25});
+    return true;
+  }},
+  apollo:{ cd:0.8, fire(p){
+    const t = nearestEnemy(540);
+    if(!t) return false;
+    faceTarget(p,t);
+    const dx=t.wx-p.wx, dy=t.wy-p.wy, L=Math.hypot(dx,dy)||1;
+    G.projectiles.push({type:'arrow', wx:p.wx, wy:p.wy, vx:dx/L*520, vy:dy/L*520, t:0, life:1.3,
+      dmg:totalDmg(p,13), col:'#ff8a2e', burn:{dps:7*p.dmgMul, dur:2.5}});
+    return true;
+  }},
+  poseidon:{ cd:7, fire(p){
+    let cur = nearestEnemy(300);
+    if(!cur) return false;
+    const chain=[], hit=new Set();
+    let from = {wx:p.wx, wy:p.wy};
+    for(let i=0;i<6 && cur;i++){
+      chain.push({a:{wx:from.wx,wy:from.wy}, b:{wx:cur.wx,wy:cur.wy}});
+      damageEnemy(cur, totalDmg(p,20), '#7fd4ff');
+      cur.slow = Math.max(cur.slow, 0.6);
+      hit.add(cur);
+      from = cur;
+      let next=null, bd=190*190;
+      for(const e of G.enemies){
+        if(hit.has(e)) continue;
+        const d = dist2(from.wx,from.wy,e.wx,e.wy);
+        if(d<bd){bd=d;next=e;}
+      }
+      cur = next;
+    }
+    G.effects.push({type:'chain', segs:chain, life:0.28, max:0.28});
+    return true;
+  }},
+  fleece:{ cd:9, passive(p){ p.armor = Math.min(p.armor, 0.75); }, fire(p){
+    if(!nearestEnemy(170*p.areaMul)) return false;
+    G.effects.push({type:'shieldwave', life:0.45, max:0.45, color:'#ffd23f'});
+    for(const e of G.enemies){
+      const d = Math.sqrt(dist2(p.wx,p.wy,e.wx,e.wy));
+      if(d < 165*p.areaMul){
+        damageEnemy(e, totalDmg(p,16), '#ffd23f');
+        e.stun = Math.max(e.stun, 0.8);
+      }
+    }
+    return true;
+  }},
+  hades:{ cd:10, fire(p){
+    if(!G.enemies.length) return false;
+    for(let i=0;i<3;i++){
+      const a = Math.random()*Math.PI*2;
+      G.projectiles.push({type:'soul', wx:p.wx+Math.cos(a)*30, wy:p.wy+Math.sin(a)*30,
+        vx:0, vy:0, t:0, life:4, dmg:totalDmg(p,26)});
+    }
+    return true;
+  }},
+  godrage:{ cd:16, fire(p){
+    if(!nearestEnemy(420)) return false;
+    G.effects.push({type:'nova', life:1.0, max:1.0, hitSet:new Set()});
+    G.shake = 0.5;
+    return true;
+  }},
+};
+
+function faceTarget(p,t){
+  setDirFromVector(p, isoX(t.wx,t.wy)-isoX(p.wx,p.wy), isoY(t.wx,t.wy)-isoY(p.wx,p.wy), false);
+}
+function screenAng(p,t){
+  return Math.atan2(isoY(t.wx,t.wy)-isoY(p.wx,p.wy), isoX(t.wx,t.wy)-isoX(p.wx,p.wy));
+}
+function setDirFromVector(p, sdx, sdy, lock){
+  if(Math.abs(sdx) > Math.abs(sdy)*0.9){
+    p.dir='side'; p.flip = sdx<0;
+  } else if(sdy>0) { p.dir='down'; }
+  else { p.dir='up'; }
+}
+
+function updateWeapons(p, dt){
+  const char = CHARS[p.hero];
+  for(const w of char.weapons){
+    if(p.level < w.lvl) continue;
+    const W = WEAPONS[w.id];
+    if(W.persistent) W.persistent(p);
+    if(W.passive) W.passive(p);
+    if(W.tick) W.tick(p,dt);
+    if(W.fire){
+      if(p.cd[w.id]===undefined) p.cd[w.id]=0;
+      p.cd[w.id] -= dt;
+      if(p.cd[w.id]<=0){
+        if(W.fire(p)) p.cd[w.id] = W.cd * p.cdMul;
+        else p.cd[w.id] = 0.12; // reintento corto si no había objetivo
+      }
+    }
+  }
+}
+
+/* =========================================================
+   COMPAÑEROS (lobo, pájaros)
+   ========================================================= */
+function updateCompanions(dt){
+  const p = G.player;
+  if(G.wolf){
+    const w = G.wolf;
+    w.anim += dt*8;
+    w.tAtk -= dt;
+    let best=null, bd=270*270;
+    for(const e of G.enemies){
+      const d = dist2(p.wx,p.wy,e.wx,e.wy);
+      if(d<bd){bd=d;best=e;}
+    }
+    w.target = best;
+    const tx = best?best.wx:p.wx-46, ty = best?best.wy:p.wy-46;
+    const dx=tx-w.wx, dy=ty-w.wy, L=Math.hypot(dx,dy);
+    if(L>4){ w.wx += dx/L*310*dt; w.wy += dy/L*310*dt; }
+    if(best && dist2(w.wx,w.wy,best.wx,best.wy) < Math.pow(best.r+18,2) && w.tAtk<=0){
+      w.tAtk = 0.35;
+      damageEnemy(best, totalDmg(p,30), '#bfe8ff');
+      G.effects.push({type:'bite', wx:best.wx, wy:best.wy, life:0.15, max:0.15});
+    }
+  }
+  for(const b of G.birds){
+    b.ang += dt*2.4;
+    const R = 120*p.areaMul;
+    b.wx = p.wx + Math.cos(b.ang)*R;
+    b.wy = p.wy + Math.sin(b.ang)*R;
+    for(const e of G.enemies){
+      if(dist2(b.wx,b.wy,e.wx,e.wy) < Math.pow(e.r+14,2)){
+        const last = b.tHit.get(e) ?? -1;
+        if(G.time - last > 0.45){
+          b.tHit.set(e, G.time);
+          damageEnemy(e, totalDmg(p,19), '#ffe27a');
+        }
+      }
+    }
+  }
+}
+
+/* =========================================================
+   PROYECTILES
+   ========================================================= */
+function updateProjectiles(dt){
+  const p = G.player;
+  for(let i=G.projectiles.length-1;i>=0;i--){
+    const pr = G.projectiles[i];
+    pr.t += dt;
+
+    if(pr.type==='espear'){
+      // lanza enemiga (alado): daña al jugador, esquivable
+      pr.wx += pr.vx*dt; pr.wy += pr.vy*dt;
+      if(dist2(pr.wx,pr.wy,p.wx,p.wy) < Math.pow(p.r+10,2)){
+        p.hp -= pr.dmg * p.armor;
+        p.hitFlash = 0.15;
+        G.shake = Math.max(G.shake, 0.12);
+        G.projectiles.splice(i,1);
+        continue;
+      }
+      if(pr.t>pr.life) G.projectiles.splice(i,1);
+      continue;
+    }
+
+    if(pr.type==='arrow'){
+      pr.wx += pr.vx*dt; pr.wy += pr.vy*dt;
+      let hit=false;
+      for(const e of G.enemies){
+        if(dist2(pr.wx,pr.wy,e.wx,e.wy) < Math.pow(e.r+8*p.areaMul,2)){
+          damageEnemy(e, pr.dmg, pr.col);
+          if(pr.burn){ e.burn = pr.burn.dur; e.burnDps = pr.burn.dps; }
+          hit=true; break;
+        }
+      }
+      if(hit || pr.t>pr.life) G.projectiles.splice(i,1);
+    }
+    else if(pr.type==='parrow' || pr.type==='feather'){
+      pr.wx += pr.vx*dt; pr.wy += pr.vy*dt;
+      for(const e of G.enemies){
+        if(!pr.hitSet.has(e) && dist2(pr.wx,pr.wy,e.wx,e.wy) < Math.pow(e.r+9*p.areaMul,2)){
+          pr.hitSet.add(e);
+          damageEnemy(e, pr.dmg, pr.col||'#d9f2e8');
+        }
+      }
+      if(pr.t>pr.life) G.projectiles.splice(i,1);
+    }
+    else if(pr.type==='bolt'){
+      const t = nearestEnemy(620, pr.wx, pr.wy);
+      if(t){
+        const dx=t.wx-pr.wx, dy=t.wy-pr.wy, L=Math.hypot(dx,dy)||1;
+        pr.vx = pr.vx*0.85 + dx/L*460*0.15*6;
+        pr.vy = pr.vy*0.85 + dy/L*460*0.15*6;
+        const vL = Math.hypot(pr.vx,pr.vy)||1;
+        pr.vx = pr.vx/vL*460; pr.vy = pr.vy/vL*460;
+      }
+      pr.wx += pr.vx*dt; pr.wy += pr.vy*dt;
+      let hit=false;
+      for(const e of G.enemies){
+        if(dist2(pr.wx,pr.wy,e.wx,e.wy) < Math.pow(e.r+10*p.areaMul,2)){
+          damageEnemy(e, pr.dmg, '#8fe89a');
+          hit=true; break;
+        }
+      }
+      if(hit || pr.t>pr.life) G.projectiles.splice(i,1);
+    }
+    else if(pr.type==='soul'){
+      const t = nearestEnemy(900, pr.wx, pr.wy);
+      if(t){
+        const dx=t.wx-pr.wx, dy=t.wy-pr.wy, L=Math.hypot(dx,dy)||1;
+        pr.wx += dx/L*330*dt; pr.wy += dy/L*330*dt;
+        if(L < t.r+12){
+          for(const e of G.enemies)
+            if(dist2(pr.wx,pr.wy,e.wx,e.wy) < Math.pow(70*p.areaMul,2))
+              damageEnemy(e, pr.dmg, '#b88aff');
+          G.effects.push({type:'soulburst', wx:pr.wx, wy:pr.wy, life:0.25, max:0.25});
+          G.projectiles.splice(i,1);
+          continue;
+        }
+      } else { pr.wx += Math.cos(pr.t*3)*40*dt; pr.wy += Math.sin(pr.t*3)*40*dt; }
+      if(pr.t>pr.life) G.projectiles.splice(i,1);
+    }
+    else if(pr.type==='fenrir'){
+      pr.anim += dt*10;
+      pr.wx += pr.vx*dt; pr.wy += pr.vy*dt;
+      for(const e of G.enemies){
+        if(!pr.hitSet.has(e) && dist2(pr.wx,pr.wy,e.wx,e.wy) < Math.pow(e.r+50,2)){
+          pr.hitSet.add(e);
+          damageEnemy(e, pr.dmg, '#bfe8ff');
+        }
+      }
+      if(pr.t>pr.life) G.projectiles.splice(i,1);
+    }
+    else if(pr.type==='axe'){
+      pr.spin += dt*16;
+      if(pr.phase==='out'){
+        pr.wx += pr.vx*dt; pr.wy += pr.vy*dt;
+        pr.traveled += Math.hypot(pr.vx,pr.vy)*dt;
+        if(pr.traveled >= pr.range){ pr.phase='back'; pr.hitSet.clear(); }
+      } else {
+        const dx=p.wx-pr.wx, dy=p.wy-pr.wy, L=Math.hypot(dx,dy);
+        if(L < 26){ G.projectiles.splice(i,1); p.axeOut=false; continue; }
+        pr.wx += dx/L*520*dt; pr.wy += dy/L*520*dt;
+      }
+      const rad = 30*p.areaMul;
+      for(const e of G.enemies){
+        if(!pr.hitSet.has(e) && dist2(pr.wx,pr.wy,e.wx,e.wy) < Math.pow(e.r+rad,2)){
+          pr.hitSet.add(e);
+          damageEnemy(e, totalDmg(p,26), '#cfe6ff');
+        }
+      }
+    }
+  }
+}
+
+/* =========================================================
+   EFECTOS DE ÁREA
+   ========================================================= */
+function updateEffects(dt){
+  const p = G.player;
+  for(let i=G.effects.length-1;i>=0;i--){
+    const fx = G.effects[i];
+    fx.life -= dt;
+    const prog = 1 - fx.life/fx.max;
+
+    if(fx.type==='blades'){
+      const R = Math.sin(prog*Math.PI) * 165 * p.areaMul;
+      for(const e of G.enemies){
+        const d = Math.sqrt(dist2(p.wx,p.wy,e.wx,e.wy));
+        if(Math.abs(d-R) < 42 && !fx.hitSet.has(e)){
+          fx.hitSet.add(e);
+          damageEnemy(e, totalDmg(p,20), '#ff9c2e');
+        }
+      }
+      fx.R = R;
+    }
+    else if(fx.type==='frost'){
+      const R = prog * 340 * p.areaMul;
+      for(const e of G.enemies){
+        const d = Math.sqrt(dist2(p.wx,p.wy,e.wx,e.wy));
+        if(d < R && !fx.hitSet.has(e)){
+          fx.hitSet.add(e);
+          damageEnemy(e, totalDmg(p,30), '#7fd4ff');
+          e.slow = Math.max(e.slow, 3.2);
+        }
+      }
+      fx.R = R;
+    }
+    else if(fx.type==='nova'){
+      const R = prog * 400 * p.areaMul;
+      for(const e of G.enemies){
+        const d = Math.sqrt(dist2(p.wx,p.wy,e.wx,e.wy));
+        if(d < R && !fx.hitSet.has(e)){
+          fx.hitSet.add(e);
+          damageEnemy(e, totalDmg(p,55), '#ffd23f');
+        }
+      }
+      fx.R = R;
+    }
+    else if(fx.type==='rain'){
+      fx.tick -= dt;
+      if(fx.tick<=0){
+        fx.tick = 0.13;
+        const a = Math.random()*Math.PI*2, r = Math.random()*fx.R;
+        const ix = fx.wx + Math.cos(a)*r, iy = fx.wy + Math.sin(a)*r;
+        for(const e of G.enemies)
+          if(dist2(ix,iy,e.wx,e.wy) < Math.pow(e.r+26,2))
+            damageEnemy(e, fx.dmg, '#9fe06c');
+        G.effects.push({type:'impact', wx:ix, wy:iy, life:0.18, max:0.18});
+      }
+    }
+
+    if(fx.life<=0){
+      if(fx.type==='zeuswarn'){
+        // el rayo cae donde estaba la marca: si seguís ahí, te pega
+        const d = Math.hypot(p.wx-fx.wx, p.wy-fx.wy);
+        if(d < fx.R){ p.hp -= fx.dmg * p.armor; p.hitFlash = 0.18; }
+        G.effects.push({type:'zeusbolt', wx:fx.wx, wy:fx.wy, life:0.32, max:0.32});
+        G.shake = Math.max(G.shake, 0.32);
+      }
+      G.effects.splice(i,1);
+    }
+  }
+}
+
+/* =========================================================
+   MEJORAS CON TOPE (solo la vida es infinita)
+   ========================================================= */
+const UPGRADES = [
+  { key:'dmg',  icon:'⚔️', name:'FURIA DE ESPARTA',  max:10, desc:'+18% de daño en todos los ataques.',
+    apply:p=>{ p.up.dmg++;  p.dmgMul   = Math.pow(1.18, p.up.dmg); } },
+  { key:'area', icon:'🌀', name:'ALCANCE RÚNICO',     max:8,  desc:'+15% de tamaño de armas y áreas.',
+    apply:p=>{ p.up.area++; p.areaMul  = Math.pow(1.15, p.up.area); } },
+  { key:'spd',  icon:'🥾', name:'BOTAS DE PROMETEO',  max:7,  desc:'+10% de velocidad de movimiento.',
+    apply:p=>{ p.up.spd++;  p.speedMul = Math.pow(1.10, p.up.spd); } },
+  { key:'pickup', icon:'🧲', name:'FAVOR DE HERMES',  max:6,  desc:'+22% al radio para recoger orbes.',
+    apply:p=>{ p.up.pickup++; p.pickupMul = Math.pow(1.22, p.up.pickup); } },
+  { key:'cd',   icon:'⏳', name:'FAVOR DE LAS NORNAS',max:7,  desc:'-8% de enfriamiento de habilidades.',
+    apply:p=>{ p.up.cd++;   p.cdMul    = Math.pow(0.92, p.up.cd); } },
+  { key:'vida', icon:'🍖', name:'MANZANAS DE IDUNN',  max:Infinity, desc:'+25 de vida máxima y cura el 50%.',
+    apply:p=>{ p.up.vida++; p.maxHp += 25; p.hp = Math.min(p.maxHp, p.hp + p.maxHp*0.5); } },
+];
+
+/* ¿el jugador ya maximizó todas las mejoras con tope? (la vida es infinita) */
+function allCappedMaxed(p){
+  for(const u of UPGRADES){ if(u.max!==Infinity && p.up[u.key] < u.max) return false; }
+  return true;
+}
+
+function gainXP(v){
+  G.player.xp += v;
+  checkLevel();
+}
+function checkLevel(){
+  const p = G.player;
+  if(p.xp < p.xpNeed || G.state!=='playing') return;
+  p.xp -= p.xpNeed;
+  p.level++;
+  p.xpNeed = Math.round(5 + p.level*4 + Math.pow(p.level,1.5));
+  // avisos de desbloqueo
+  for(const w of CHARS[p.hero].weapons)
+    if(w.lvl === p.level) logWeapon(w.nom);
+  showLevelUp();
+}
+
+function showLevelUp(){
+  G.state='levelup';
+  const p = G.player;
+  document.getElementById('luLvl').textContent = p.level;
+  const box = document.getElementById('upgrades');
+  box.innerHTML='';
+  const available = UPGRADES.filter(u => p.up[u.key] < u.max);
+  const pool = [...available].sort(()=>Math.random()-0.5).slice(0,3);
+  for(const up of pool){
+    const card = document.createElement('div');
+    card.className='upcard';
+    const stacks = p.up[up.key];
+    const cap = up.max===Infinity ? '∞' : up.max;
+    card.innerHTML = `<div class="icon">${up.icon}</div><h3>${up.name}</h3><p>${up.desc}</p>
+      <div class="stack">NIVEL ${stacks} / ${cap}</div>`;
+    card.onclick = ()=>{
+      up.apply(p);
+      renderUpgradeStrip();
+      document.getElementById('levelup').classList.add('hidden');
+      G.state='playing';
+      checkLevel(); // por si quedó XP acumulada para otro nivel
+    };
+    box.appendChild(card);
+  }
+  document.getElementById('levelup').classList.remove('hidden');
+}
+
+/* Tira de mejoras elegidas: icono + puntitos negros según el nivel de cada una */
+function renderUpgradeStrip(){
+  const p = G.player; if(!p) return;
+  const box = document.getElementById('upbar');
+  box.innerHTML = '';
+  let any = false;
+  for(const u of UPGRADES){
+    const lvl = p.up[u.key];
+    if(lvl <= 0) continue;
+    any = true;
+    const row = document.createElement('div');
+    row.className = 'uprow';
+    let dots = '';
+    if(u.max === Infinity){
+      // vida: tope infinito, mostramos el número
+      dots = `<span class="num">x${lvl}</span>`;
+    } else {
+      dots = '<div class="dots">';
+      for(let i=0;i<u.max;i++) dots += `<div class="dot${i<lvl?' on':''}"></div>`;
+      dots += '</div>';
+    }
+    row.innerHTML = `<span class="ic">${u.icon}</span>${dots}`;
+    box.appendChild(row);
+  }
+  box.style.display = any ? 'flex' : 'none';
+}
+
+/* =========================================================
+   ESCENARIO — ruinas de Esparta / Atenas
+   ========================================================= */
+const CHUNK = 620;
+const pillarCache = new Map();
+function chunkPillars(cx, cy){
+  const key = cx+','+cy;
+  if(pillarCache.has(key)) return pillarCache.get(key);
+  const out = [];
+  const h = hash2(cx, cy);
+  const rng = mulberry(h);
+
+  // OLIMPO (nivel 2): columnas de mármol densas y estatuas dispersas
+  if(G.realm==='olimpo'){
+    const isStart = (cx===0 && cy===0);   // dejar libre el punto de aparición
+    if(!isStart && h%2===0){
+      const n = 1 + (h%3);
+      for(let i=0;i<n;i++){
+        out.push({
+          wx: cx*CHUNK + 70 + rng()*(CHUNK-140),
+          wy: cy*CHUNK + 70 + rng()*(CHUNK-140),
+          broken: rng() < 0.15,
+          h: 95 + rng()*45,
+          r: 22, marble:true,
+        });
+      }
+    }
+    if(!isStart && h%4===0){
+      out.push({
+        wx: cx*CHUNK + 120 + rng()*(CHUNK-240),
+        wy: cy*CHUNK + 120 + rng()*(CHUNK-240),
+        statue:true, marble:true, h:0, r:26,
+      });
+    }
+    pillarCache.set(key, out);
+    return out;
+  }
+
+  // sin columnas en el chunk de inicio ni en los de los monumentos
+  const isHome = (cx===0 && cy===0);
+  const isTemple = (cx===2 && cy===-2);
+  const isStatue = (cx===-2 && cy===2);
+  if(!isHome && !isTemple && !isStatue && h%3===0){
+    const n = 1 + (h%2);
+    for(let i=0;i<n;i++){
+      out.push({
+        wx: cx*CHUNK + 80 + rng()*(CHUNK-160),
+        wy: cy*CHUNK + 80 + rng()*(CHUNK-160),
+        broken: rng() < 0.45,
+        h: 70 + rng()*40,
+        r: 22,
+      });
+    }
+  }
+  pillarCache.set(key, out);
+  return out;
+}
+function pillarsNear(wx, wy, range){
+  const out=[];
+  const c0x = Math.floor((wx-range)/CHUNK), c1x = Math.floor((wx+range)/CHUNK);
+  const c0y = Math.floor((wy-range)/CHUNK), c1y = Math.floor((wy+range)/CHUNK);
+  for(let cx=c0x; cx<=c1x; cx++)
+    for(let cy=c0y; cy<=c1y; cy++)
+      out.push(...chunkPillars(cx,cy));
+  return out;
+}
+
+/* Monumentos fijos */
+const TEMPLE = { wx: 2*CHUNK+300, wy: -2*CHUNK+300 };   // El Panteón / Partenón
+const STATUE = { wx: -2*CHUNK+300, wy: 2*CHUNK+300 };   // Estatua del Olimpo
+const TEMPLE_PILLARS = [];
+for(let i=0;i<5;i++) TEMPLE_PILLARS.push({ wx:TEMPLE.wx-140+i*70, wy:TEMPLE.wy+90, broken:false, h:0, r:24, invisible:true });
+
+function collidePillars(ent){
+  const list = pillarsNear(ent.wx, ent.wy, 80).concat(TEMPLE_PILLARS);
+  for(const c of list){
+    const dx = ent.wx-c.wx, dy = ent.wy-c.wy;
+    const d = Math.hypot(dx,dy);
+    const min = c.r + (ent.r||14);
+    if(d < min && d>0.001){
+      ent.wx = c.wx + dx/d*min;
+      ent.wy = c.wy + dy/d*min;
+    }
+  }
+}
+
+/* ---- dibujo de estructuras ---- */
+function drawColumn(x, y, h, broken, scale, marble){
+  const s = scale||1;
+  const w = 26*s;
+  // paleta: piedra arenosa (Grecia) o mármol blanco (Olimpo)
+  const C = marble
+    ? { base:'#c9c4bb', cap:'#e6e2d8', shaft:'#f2efe7', stria:'#d8d3c7', edge:'#cfcabf', rubble:'#cfcabf' }
+    : { base:'#8e887b', cap:'#a59e8e', shaft:'#cfc9bb', stria:'#b0a996', edge:'#a59e8e', rubble:'#9a9482' };
+  // sombra
+  ctx.fillStyle='rgba(0,0,0,0.35)';
+  ctx.beginPath(); ctx.ellipse(x, y+4, w*0.85, w*0.36, 0, 0, Math.PI*2); ctx.fill();
+  // base
+  ctx.fillStyle=C.base;
+  ctx.fillRect(x-w/2-4*s, y-8*s, w+8*s, 8*s);
+  ctx.fillStyle=C.cap;
+  ctx.fillRect(x-w/2-2*s, y-14*s, w+4*s, 6*s);
+  // fuste con estrías
+  const sh = (broken ? h*0.55 : h)*s;
+  ctx.fillStyle=C.shaft;
+  ctx.fillRect(x-w/2, y-14*s-sh, w, sh);
+  ctx.fillStyle=C.stria;
+  for(let i=1;i<4;i++) ctx.fillRect(x-w/2 + i*w/4 -1, y-14*s-sh, 2, sh);
+  ctx.fillStyle=C.edge;
+  ctx.fillRect(x+w/2-4*s, y-14*s-sh, 4*s, sh);
+  if(broken){
+    ctx.fillStyle=C.shaft;
+    ctx.fillRect(x-w/2, y-14*s-sh-5*s, 8*s, 5*s);
+    ctx.fillRect(x-w/2+12*s, y-14*s-sh-8*s, 7*s, 8*s);
+    ctx.fillStyle=C.rubble;
+    ctx.fillRect(x+w/2+4*s, y-6*s, 9*s, 6*s);
+    ctx.fillRect(x-w/2-12*s, y-4*s, 7*s, 4*s);
+  } else {
+    // capitel
+    ctx.fillStyle=marble?'#f4f1ea':'#ddd7c8';
+    ctx.fillRect(x-w/2-3*s, y-14*s-sh-6*s, w+6*s, 6*s);
+    ctx.fillStyle=C.cap;
+    ctx.fillRect(x-w/2-5*s, y-14*s-sh-10*s, w+10*s, 4*s);
+  }
+}
+
+/* Estatua de mármol pequeña (dispersa por el Olimpo) */
+function drawStatueSmall(x, y){
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.ellipse(x, y+4, 30, 11, 0, 0, Math.PI*2); ctx.fill();
+  // pedestal
+  ctx.fillStyle='#d3cfc5'; ctx.fillRect(x-22, y-12, 44, 12);
+  ctx.fillStyle='#e8e4da'; ctx.fillRect(x-17, y-22, 34, 10);
+  // figura de mármol
+  const m='#f1eee6', mS='#d8d3c7';
+  ctx.fillStyle=m;  ctx.fillRect(x-10, y-22-54, 20, 54);     // túnica
+  ctx.fillStyle=mS; ctx.fillRect(x-10, y-22-54, 6, 54);
+  ctx.fillStyle=m;  ctx.fillRect(x-7,  y-22-72, 14, 18);     // cabeza
+  ctx.fillStyle=mS; ctx.fillRect(x+6,  y-22-66, 6, 30);      // brazo
+  ctx.fillStyle=m;  ctx.fillRect(x+10, y-22-92, 4, 70);      // lanza/cetro
+}
+
+/* Cuerno de Amaltea (cornucopia dorada) para el item imán */
+function drawHorn(x, y){
+  ctx.save();
+  ctx.translate(x, y);
+  // cuerpo del cuerno
+  ctx.fillStyle='#caa11f';
+  ctx.beginPath();
+  ctx.moveTo(-9,-5);
+  ctx.quadraticCurveTo(6,-9, 10,2);
+  ctx.quadraticCurveTo(6,7, -2,6);
+  ctx.quadraticCurveTo(-8,4, -9,-5);
+  ctx.closePath(); ctx.fill();
+  // brillo
+  ctx.fillStyle='#ffd23f';
+  ctx.beginPath();
+  ctx.moveTo(-9,-5);
+  ctx.quadraticCurveTo(2,-7, 6,0);
+  ctx.quadraticCurveTo(2,3, -4,3);
+  ctx.quadraticCurveTo(-8,1, -9,-5);
+  ctx.closePath(); ctx.fill();
+  // boca del cuerno
+  ctx.fillStyle='#8a6a12';
+  ctx.beginPath(); ctx.ellipse(-9,-3, 2.6, 5, -0.3, 0, Math.PI*2); ctx.fill();
+  // frutos que salen
+  ctx.fillStyle='#d83a2e'; ctx.beginPath(); ctx.arc(-12,-2, 2.6, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#3ad13a'; ctx.beginPath(); ctx.arc(-13, 1, 2.1, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#ffe27a'; ctx.beginPath(); ctx.arc(-11, 2, 1.8, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawTemple(x, y){
+  const W = 380, colH = 95;
+  // sombra grande
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.ellipse(x, y+10, W*0.62, 40, 0, 0, Math.PI*2); ctx.fill();
+  // escalinata (estilóbato)
+  ctx.fillStyle='#8e887b'; ctx.fillRect(x-W/2-26, y-10, W+52, 12);
+  ctx.fillStyle='#a59e8e'; ctx.fillRect(x-W/2-14, y-20, W+28, 10);
+  ctx.fillStyle='#bdb6a3'; ctx.fillRect(x-W/2,    y-30, W,    10);
+  // pared interior en penumbra
+  ctx.fillStyle='#3a3528';
+  ctx.fillRect(x-W/2+18, y-30-colH, W-36, colH);
+  // columnata frontal
+  for(let i=0;i<7;i++){
+    const cx = x - W/2 + 28 + i*((W-56)/6);
+    ctx.fillStyle='#cfc9bb';
+    ctx.fillRect(cx-9, y-30-colH, 18, colH);
+    ctx.fillStyle='#b0a996';
+    ctx.fillRect(cx+4, y-30-colH, 4, colH);
+    ctx.fillStyle='#ddd7c8';
+    ctx.fillRect(cx-12, y-30-colH-6, 24, 6);
+    ctx.fillRect(cx-11, y-30, 22, 5);
+  }
+  // entablamento
+  ctx.fillStyle='#cfc9bb'; ctx.fillRect(x-W/2-8, y-30-colH-20, W+16, 16);
+  ctx.fillStyle='#9a9482';
+  for(let i=0;i<13;i++) ctx.fillRect(x-W/2+4+i*(W/13), y-30-colH-18, 6, 12); // triglifos
+  // frontón
+  ctx.fillStyle='#ddd7c8';
+  ctx.beginPath();
+  ctx.moveTo(x-W/2-12, y-30-colH-20);
+  ctx.lineTo(x, y-30-colH-78);
+  ctx.lineTo(x+W/2+12, y-30-colH-20);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#8e887b';
+  ctx.beginPath();
+  ctx.moveTo(x-W/2+28, y-30-colH-24);
+  ctx.lineTo(x, y-30-colH-64);
+  ctx.lineTo(x+W/2-28, y-30-colH-24);
+  ctx.closePath(); ctx.fill();
+  // figuras del frontón (siluetas)
+  ctx.fillStyle='#5a5343';
+  ctx.fillRect(x-30, y-30-colH-48, 10, 22);
+  ctx.fillRect(x+20, y-30-colH-44, 10, 18);
+  ctx.fillRect(x-4,  y-30-colH-56, 9, 30);
+}
+
+function drawStatue(x, y){
+  // Estatua de un dios del Olimpo sobre pedestal
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  ctx.beginPath(); ctx.ellipse(x, y+8, 80, 26, 0, 0, Math.PI*2); ctx.fill();
+  // pedestal
+  ctx.fillStyle='#8e887b'; ctx.fillRect(x-58, y-14, 116, 14);
+  ctx.fillStyle='#a59e8e'; ctx.fillRect(x-48, y-30, 96, 16);
+  ctx.fillStyle='#cfc9bb'; ctx.fillRect(x-40, y-58, 80, 28);
+  ctx.fillStyle='#6e675a';
+  ctx.font='10px monospace'; ctx.textAlign='center';
+  ctx.fillText('ΟΛΥΜΠΟΣ', x, y-40);
+  ctx.textAlign='left';
+  // figura de bronce
+  const bz='#5e4a2e', bzL='#7a6038';
+  ctx.fillStyle=bz;
+  ctx.fillRect(x-16, y-58-70, 32, 70);          // torso/túnica
+  ctx.fillStyle=bzL;
+  ctx.fillRect(x-16, y-58-70, 8, 70);
+  ctx.fillStyle=bz;
+  ctx.fillRect(x-10, y-58-92, 20, 22);          // cabeza
+  // cresta de casco
+  ctx.fillStyle='#8c2c20';
+  ctx.fillRect(x-4, y-58-104, 8, 14);
+  // brazo con lanza
+  ctx.fillStyle=bz;
+  ctx.fillRect(x+14, y-58-66, 10, 36);
+  ctx.fillStyle='#bdb6a3';
+  ctx.fillRect(x+20, y-58-130, 4, 120);          // lanza
+  ctx.fillStyle='#ddd7c8';
+  ctx.beginPath();
+  ctx.moveTo(x+22, y-58-142);
+  ctx.lineTo(x+16, y-58-126);
+  ctx.lineTo(x+28, y-58-126);
+  ctx.closePath(); ctx.fill();
+  // escudo
+  ctx.fillStyle='#7a5a2c';
+  ctx.beginPath(); ctx.arc(x-22, y-58-44, 16, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#9a7438';
+  ctx.beginPath(); ctx.arc(x-22, y-58-44, 8, 0, Math.PI*2); ctx.fill();
+}
+
+/* =========================================================
+   JEFE: ZEUS + TRANSICIÓN AL OLIMPO
+   ========================================================= */
+function showNextLevel(){ document.getElementById('nextlevel').classList.add('show'); }
+function hideNextLevel(){ document.getElementById('nextlevel').classList.remove('show'); }
+
+function triggerZeus(){
+  G.bossActive = true;
+  // que desaparezcan los enemigos normales
+  for(const e of G.enemies)
+    G.particles.push({wx:e.wx, wy:e.wy, vx:rand(-40,40), vy:rand(-40,40), life:0.5, color:'#7fd4ff', size:4});
+  G.enemies.length = 0;
+  G.shake = 0.6;
+  spawnZeus();
+}
+
+function spawnZeus(){
+  const p = G.player;
+  // aparece enfrente del jugador a media distancia
+  const ang = Math.random()*Math.PI*2;
+  const T = ETYPES.zeus;
+  const e = {
+    type:'zeus', T,
+    wx: p.wx + Math.cos(ang)*420, wy: p.wy + Math.sin(ang)*420,
+    r:T.r, hp:T.hp, maxHp:T.hp,
+    speed: T.spd[0], dmg:T.dmg,
+    slow:0, stun:0, burn:0, burnDps:0, hitFlash:0,
+    anim:Math.random()*10, spawnT:0.5,
+    tpT:0, chT:0, charging:0, cvx:0, cvy:0,
+    castT:2.4, casting:0,                 // temporizadores de rayos
+    mode:'normal', invuln:false,          // segunda fase (tormenta invulnerable)
+    nextStormHp:T.hp*0.6, healTarget:0, healRate:0, stormCast:0,
+  };
+  G.enemies.push(e);
+  logBoss('¡ZEUS, REY DEL OLIMPO, DESCIENDE!');
+}
+
+function onZeusDefeated(){
+  G.bossActive = false;
+  G.bossDone   = true;
+  G.enemies.length = 0; G.projectiles.length = 0; G.effects.length = 0;
+  G.transition = 3.0; G.swapped = false;
+  G.shake = 0.5;
+  showNextLevel();
+  logBoss('¡ZEUS HA CAÍDO!');
+}
+
+function enterOlympus(){
+  const p = G.player;
+  G.realm = 'olimpo';
+  G.olympusStart = G.time;          // el escalado del Olimpo arranca de cero acá
+  pillarCache.clear();              // regenera el escenario en mármol
+  p.wx = 0; p.wy = 0;               // reaparecer en suelo de mármol limpio
+  p.hp = p.maxHp;                   // recuperación al subir de nivel
+  G.enemies.length = 0; G.orbs.length = 0; G.projectiles.length = 0;
+  G.items.length = 0; G.itemTimer = 6; G.vacuum = 0;
+  G.spawnTimer = 3;                 // respiro antes de reanudar las hordas
+  G.bossTimer = 1e9;                // sin cíclope automático en el Olimpo por ahora
+  logWeapon('BIENVENIDO AL OLIMPO');
+}
+
+/* =========================================================
+   ITEMS DESPARRAMADOS — vida (bolita verde) y Cuerno de Amaltea (imán)
+   ========================================================= */
+function spawnItem(){
+  const p = G.player;
+  // aparece desparramado alrededor del jugador, dentro/cerca de lo visible
+  const ang = Math.random()*Math.PI*2;
+  const Rs = rand(200, 480);
+  const sx = Math.cos(ang)*Rs, sy = Math.sin(ang)*Rs;
+  const kind = Math.random() < 0.5 ? 'heal' : 'magnet';
+  G.items.push({ kind, wx: p.wx + (sy + sx/2), wy: p.wy + (sy - sx/2), t:0 });
+}
+
+/* IA de Zeus: fase normal con rayos esquivables + segunda fase de tormenta invulnerable */
+function updateZeus(e, dt){
+  const p = G.player;
+  const dx = p.wx-e.wx, dy = p.wy-e.wy, L = Math.hypot(dx,dy)||1;
+
+  /* ----- SEGUNDA FASE: tormenta. Invulnerable, se cura 20% y caen rayos que te siguen ----- */
+  if(e.mode==='storm'){
+    // flota lento hacia vos (no persigue de verdad)
+    e.wx += dx/L*30*dt; e.wy += dy/L*30*dt;
+    // recupera vida
+    e.hp = Math.min(e.maxHp, e.hp + e.healRate*dt);
+    // rayos encadenados que caen sobre tu posición: hay que mantenerse en movimiento
+    e.stormCast -= dt;
+    if(e.stormCast<=0){
+      e.stormCast = 0.5;
+      const tx = p.wx + (p.lastvx||0)*0.18;
+      const ty = p.wy + (p.lastvy||0)*0.18;
+      G.effects.push({type:'zeuswarn', wx:tx, wy:ty, R:80, life:0.7, max:0.7, dmg:24});
+    }
+    e.casting = 0.3;   // mano cargada de forma continua
+    // termina cuando recuperó el 20%: vuelve a ser vulnerable y ataca normal
+    if(e.hp >= e.healTarget){
+      e.mode='normal'; e.invuln=false; e.casting=0; e.castT=1.4;
+      G.effects.push({type:'shieldwave', life:0.5, max:0.5, color:'#ffd23f'});
+      logBoss('¡ZEUS VUELVE A SER VULNERABLE!');
+    }
+    return;
+  }
+
+  /* ----- ¿cruza el umbral de vida? entra en tormenta ----- */
+  if(e.hp <= e.nextStormHp){
+    e.mode='storm'; e.invuln=true;
+    e.healTarget = Math.min(e.maxHp, e.hp + e.maxHp*0.20);
+    e.healRate   = e.maxHp*0.20 / 6;      // recupera 20% en unos 6 segundos
+    e.nextStormHp -= e.maxHp*0.30;        // el próximo umbral es más bajo
+    e.stormCast = 0.4;
+    G.effects.push({type:'shieldwave', life:0.6, max:0.6, color:'#bff0ff'});
+    G.shake = 0.5;
+    logBoss('¡ZEUS SE VUELVE INVULNERABLE Y DESATA LA TORMENTA!');
+    return;
+  }
+
+  /* ----- FASE NORMAL: mantiene distancia, rayos puntuales, melee de rango corto ----- */
+  const CLOSE = 175;     // dentro de este radio NO lanza rayos (toca pegarle de cerca)
+  const KEEP  = 250;     // distancia que intenta mantener
+  let mv = 0;
+  if(L < CLOSE) mv = -1;
+  else if(L > KEEP+60) mv = 1;
+  if(mv !== 0){
+    const sp = e.speed * (e.slow>0?0.4:1) * (mv>0?1:0.8);
+    e.wx += dx/L*sp*mv*dt;
+    e.wy += dy/L*sp*mv*dt;
+  }
+  e.castT -= dt;
+  if(e.castT<=0 && L>CLOSE && e.stun<=0){
+    const low = e.hp < e.maxHp*0.5;
+    e.castT = low ? 2.0 : 2.8;
+    const bolts = low ? 3 : 1;
+    for(let i=0;i<bolts;i++){
+      const lead = i===0 ? 0 : rand(-120,120);
+      const tx = p.wx + (p.lastvx||0)*0.2 + lead;
+      const ty = p.wy + (p.lastvy||0)*0.2 + rand(-60,60)*(i?1:0);
+      G.effects.push({type:'zeuswarn', wx:tx, wy:ty, R:90, life:0.85, max:0.85, dmg:26});
+    }
+    e.casting = 0.4;
+  }
+  if(e.casting>0) e.casting -= dt;
+}
+
+
+function update(dt){
+  const p = G.player;
+  G.time += dt;
+  p.anim += dt;
+  if(p.lunge>0) p.lunge -= dt;
+  if(p.hitFlash>0) p.hitFlash -= dt;
+  if(p.chill>0) p.chill -= dt;
+  if(p.regen>0) p.hp = Math.min(p.maxHp, p.hp + p.regen*dt);
+
+  /* movimiento — uniforme en pantalla (lados, vertical y diagonales a la misma velocidad) */
+  let ix = (keys['d']||keys['arrowright']?1:0) - (keys['a']||keys['arrowleft']?1:0);
+  let iy = (keys['s']||keys['arrowdown']?1:0) - (keys['w']||keys['arrowup']?1:0);
+  p.moving = !!(ix||iy);
+  p.lastvx = 0; p.lastvy = 0;
+  if(p.moving){
+    // normalizamos la dirección EN PANTALLA y la convertimos a mundo con la
+    // inversa de la proyección iso; así la velocidad aparente es idéntica
+    // hacia los lados, arriba/abajo y en diagonal.
+    const L = Math.hypot(ix,iy)||1;
+    const sdx = ix/L, sdy = iy/L;
+    const wdx = sdy + sdx/2;
+    const wdy = sdy - sdx/2;
+    let sp = p.speed * p.speedMul * (p.featherSpd?1.15:1) * (p.chill>0?0.6:1);
+    p.wx += wdx*sp*dt;
+    p.wy += wdy*sp*dt;
+    p.lastvx = wdx*sp; p.lastvy = wdy*sp;
+    setDirFromVector(p, ix, iy, true);
+    p.walkPhase += dt*9;
+  }
+  collidePillars(p);
+
+  /* disparador del jefe Zeus a los 10 minutos (solo en Grecia) */
+  if(!G.bossActive && !G.bossDone && G.realm==='grecia' && (G.time>=600 || allCappedMaxed(p))){
+    triggerZeus();
+  }
+
+  /* spawn de hordas (pausado durante la pelea con Zeus y en el cartel) */
+  if(!G.bossActive && G.transition<=0){
+    G.spawnTimer -= dt;
+    const interval = Math.max(0.18, 1.1 - G.time*0.011);
+    if(G.spawnTimer<=0){
+      G.spawnTimer = interval;
+      spawnEnemy();
+      if(G.time>100) spawnEnemy();
+      if(G.time>220) spawnEnemy();
+    }
+    /* jefe cíclope periódico (solo en Grecia, antes de Zeus) */
+    if(G.realm==='grecia' && !G.bossDone){
+      G.bossTimer -= dt;
+      if(G.bossTimer<=0 && G.time < 560){
+        G.bossTimer = 90;
+        spawnEnemy('ciclope');
+      }
+    }
+  }
+
+  /* cartel "SIGUIENTE NIVEL" y cambio de escenario al Olimpo */
+  if(G.transition>0){
+    G.transition -= dt;
+    if(G.transition < 1.6 && !G.swapped){ G.swapped = true; enterOlympus(); }
+    if(G.transition <= 0){ hideNextLevel(); }
+  }
+
+  /* items desparramados: vida y Cuerno de Amaltea (cada tanto, sin saturar) */
+  if(G.transition<=0){
+    G.itemTimer -= dt;
+    if(G.itemTimer<=0 && G.items.length < 8){
+      G.itemTimer = rand(18, 32);
+      spawnItem();
+    }
+  }
+  if(G.vacuum>0) G.vacuum -= dt;
+
+  /* enemigos */
+  for(let i=G.enemies.length-1;i>=0;i--){
+    const e = G.enemies[i];
+    e.anim += dt*6;
+    if(e.spawnT>0) e.spawnT -= dt;
+    if(e.slow>0) e.slow -= dt;
+    if(e.stun>0) e.stun -= dt;
+    if(e.hitFlash>0) e.hitFlash -= dt;
+    if(e.burn>0){
+      e.burn -= dt;
+      e.hp -= e.burnDps*dt;
+      if(Math.random()<dt*8) G.particles.push({wx:e.wx+rand(-10,10), wy:e.wy+rand(-10,10), vx:rand(-20,20), vy:rand(-40,-10), life:0.4, color:'#ff8a2e', size:3});
+    }
+
+    const dx=p.wx-e.wx, dy=p.wy-e.wy, L=Math.hypot(dx,dy)||1;
+    const isZeus = e.T.custom==='zeus';
+    const isAlado = e.T.custom==='alado';
+    if(isZeus) updateZeus(e, dt);
+
+    /* Alado: vuela manteniendo distancia y tira lanzas (esquivables) */
+    if(isAlado && e.stun<=0){
+      const KEEP = 300;
+      let mv = 0;
+      if(L < KEEP-40) mv = -1;          // si te acercás, se aleja
+      else if(L > KEEP+80) mv = 1;      // si estás lejos, se acerca
+      if(mv !== 0){ const sp = e.speed*(e.slow>0?0.4:1); e.wx += dx/L*sp*mv*dt; e.wy += dy/L*sp*mv*dt; }
+      else { e.wx += -dy/L*e.speed*0.5*dt; e.wy += dx/L*e.speed*0.5*dt; } // orbita un poco
+      e.shootT -= dt;
+      if(e.shootT<=0 && L < 560){
+        e.shootT = rand(1.6, 2.4);
+        const tx = p.wx + (p.lastvx||0)*0.25, ty = p.wy + (p.lastvy||0)*0.25;
+        const a = Math.atan2(ty-e.wy, tx-e.wx);
+        const sp = 300;   // lenta: se puede esquivar moviéndose
+        G.projectiles.push({ type:'espear', wx:e.wx, wy:e.wy-26, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, t:0, life:2.4, dmg:e.dmg, ang:a });
+      }
+    }
+
+    /* comportamientos especiales */
+    if(!isZeus && !isAlado && e.T.teleport){
+      e.tpT -= dt;
+      if(e.tpT<=0 && L>140){
+        e.tpT = rand(3,4.5);
+        G.effects.push({type:'puff', wx:e.wx, wy:e.wy, life:0.3, max:0.3});
+        const jump = Math.min(L-90, 200);
+        e.wx += dx/L*jump; e.wy += dy/L*jump;
+        G.effects.push({type:'puff', wx:e.wx, wy:e.wy, life:0.3, max:0.3});
+      }
+    }
+    if(!isZeus && e.T.charger && e.stun<=0){
+      e.chT -= dt;
+      if(e.charging>0){
+        e.charging -= dt;
+        e.wx += e.cvx*dt; e.wy += e.cvy*dt;
+      } else if(e.chT<=0 && L<420 && L>100){
+        e.chT = rand(3.5,5);
+        e.charging = 0.65;
+        e.cvx = dx/L*330; e.cvy = dy/L*330;
+        G.effects.push({type:'snort', wx:e.wx, wy:e.wy, life:0.25, max:0.25});
+      }
+    }
+
+    if(!isZeus && !isAlado && e.stun<=0 && e.charging<=0){
+      const sp = e.speed * (e.slow>0?0.28:1);
+      e.wx += dx/L*sp*dt;
+      e.wy += dy/L*sp*dt;
+    }
+    collidePillars(e);
+
+    /* contacto */
+    if(L < e.r + p.r){
+      p.hp -= e.dmg * p.armor * dt;
+      p.hitFlash = 0.1;
+      if(e.T.chill)   p.chill   = 1.2;
+      if(e.T.petrify) p.chill   = Math.max(p.chill, 0.8);
+      G.shake = Math.max(G.shake, 0.08);
+    }
+    if(e.hp<=0){
+      if(isZeus){ killEnemy(e,i); onZeusDefeated(); }
+      else killEnemy(e,i);
+    }
+  }
+
+  /* armas y compañeros */
+  updateWeapons(p, dt);
+  updateCompanions(dt);
+  updateProjectiles(dt);
+  updateEffects(dt);
+
+  /* orbes de XP */
+  for(let i=G.orbs.length-1;i>=0;i--){
+    const o = G.orbs[i];
+    o.t += dt;
+    const d = Math.sqrt(dist2(p.wx,p.wy,o.wx,o.wy));
+    if(G.vacuum>0){
+      // Cuerno de Amaltea activo: atrae TODAS las bolitas sin importar la distancia
+      const dd = d||1;
+      o.wx += (p.wx-o.wx)/dd*1200*dt;
+      o.wy += (p.wy-o.wy)/dd*1200*dt;
+    } else {
+      const reach = 140 * p.pickupMul;       // Favor de Hermes amplía el radio
+      if(d < reach){
+        const pull = (1 - d/reach)*440 + 60;
+        o.wx += (p.wx-o.wx)/d*pull*dt;
+        o.wy += (p.wy-o.wy)/d*pull*dt;
+      }
+    }
+    if(d < p.r+8){
+      G.orbs.splice(i,1);
+      gainXP(o.val);
+      if(G.state!=='playing') break;
+    }
+  }
+
+  /* items desparramados: vida (verde) y Cuerno de Amaltea (imán) */
+  for(let i=G.items.length-1;i>=0;i--){
+    const it = G.items[i];
+    it.t += dt;
+    const d = Math.sqrt(dist2(p.wx,p.wy,it.wx,it.wy));
+    if(d < p.r+14){
+      if(it.kind==='heal'){
+        p.hp = Math.min(p.maxHp, p.hp + p.maxHp*0.5);
+        G.effects.push({type:'shieldwave', life:0.45, max:0.45, color:'#5be36a'});
+        logWeapon('+50% DE VIDA');
+      } else {
+        // Cuerno de Amaltea: imán que absorbe todas las bolitas que quedaron
+        G.vacuum = 1.4;
+        G.effects.push({type:'shieldwave', life:0.5, max:0.5, color:'#ffd23f'});
+        logWeapon('¡CUERNO DE AMALTEA!');
+      }
+      G.items.splice(i,1);
+      if(G.state!=='playing') break;
+    }
+  }
+
+  /* partículas */
+  for(let i=G.particles.length-1;i>=0;i--){
+    const pa = G.particles[i];
+    pa.life -= dt;
+    pa.wx += pa.vx*dt; pa.wy += pa.vy*dt;
+    if(pa.life<=0) G.particles.splice(i,1);
+  }
+
+  /* textos de daño */
+  for(let i=G.dmgTexts.length-1;i>=0;i--){
+    const t = G.dmgTexts[i];
+    t.life -= dt; t.rise += dt*42;
+    if(t.life<=0) G.dmgTexts.splice(i,1);
+  }
+
+  if(G.shake>0) G.shake -= dt;
+
+  /* muerte */
+  if(p.hp<=0){
+    p.hp=0;
+    G.state='gameover';
+    const m = Math.floor(G.time/60), s = Math.floor(G.time%60);
+    document.getElementById('finalstats').innerHTML =
+      `Héroe: <b style="color:var(--gold)">${CHARS[p.hero].name}</b><br>`+
+      `Nivel alcanzado: <b>${p.level}</b><br>`+
+      `Enemigos derrotados: <b>${G.kills}</b><br>`+
+      `Tiempo sobrevivido: <b>${m}:${String(s).padStart(2,'0')}</b>`;
+    document.getElementById('gameover').classList.remove('hidden');
+  }
+
+  /* HUD */
+  const hpPct = clamp(p.hp/p.maxHp,0,1);
+  document.getElementById('hpfill').style.transform = `scaleX(${hpPct})`;
+  document.getElementById('hptext').textContent = `${Math.ceil(p.hp)} / ${p.maxHp} · ${Math.round(hpPct*100)}%`;
+  document.getElementById('xpfill').style.transform = `scaleX(${clamp(p.xp/p.xpNeed,0,1)})`;
+  document.getElementById('lvlleft').textContent = `NIVEL ${p.level}`;
+  document.getElementById('lvltxt').textContent = p.level;
+  document.getElementById('killtxt').textContent = G.kills;
+  const m = Math.floor(G.time/60), s = Math.floor(G.time%60);
+  document.getElementById('timetxt').textContent = `${m}:${String(s).padStart(2,'0')}`;
+}
+
+/* =========================================================
+   RENDER
+   ========================================================= */
+function render(){
+  const p = G.player;
+  const W = canvas.width, H = canvas.height;
+
+  /* cielo / arena base */
+  const bg = ctx.createLinearGradient(0,0,0,H);
+  if(G.realm==='olimpo'){ bg.addColorStop(0,'#cfe3f2'); bg.addColorStop(1,'#a9c6dc'); }
+  else { bg.addColorStop(0,'#2e2516'); bg.addColorStop(1,'#241c10'); }
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,W,H);
+  if(!p) return;
+
+  const cx = isoX(p.wx,p.wy), cy = isoY(p.wx,p.wy);
+  const ox = W/2 - cx + (G.shake>0 ? rand(-7,7)*G.shake*4 : 0);
+  const oy = H/2 - cy + (G.shake>0 ? rand(-7,7)*G.shake*4 : 0);
+  const SX = (wx,wy)=> isoX(wx,wy)+ox;
+  const SY = (wx,wy)=> isoY(wx,wy)+oy;
+
+  /* --- suelo: baldosas iso (arena en Grecia, mármol en el Olimpo) --- */
+  const oly = G.realm==='olimpo';
+  const grid = 80;
+  const RANGE = Math.max(W,H) * 1.35;
+  const x0 = Math.floor((p.wx - RANGE)/grid)*grid;
+  const x1 = p.wx + RANGE;
+  const y0 = Math.floor((p.wy - RANGE)/grid)*grid;
+  const y1 = p.wy + RANGE;
+
+  for(let gx=x0; gx<=x1; gx+=grid){
+    for(let gy=y0; gy<=y1; gy+=grid){
+      const h = hash2(gx/grid|0, gy/grid|0);
+      const v = h%5;
+      let col = null;
+      if(oly){
+        // baldosas de mármol blanco
+        col = ((gx/grid)+(gy/grid))%2===0 ? 'rgba(255,255,255,0.18)' : 'rgba(222,230,240,0.11)';
+        if(v===1) col = 'rgba(150,170,192,0.15)';       // veta gris del mármol
+      } else {
+        if(((gx/grid)+(gy/grid))%2===0) col = 'rgba(255,220,160,0.030)';
+        if(v===0) col = 'rgba(255,210,140,0.055)';      // mancha de arena clara
+        if(v===1) col = 'rgba(120,100,70,0.10)';        // losa de piedra hundida
+      }
+      if(col){
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(SX(gx,gy),           SY(gx,gy));
+        ctx.lineTo(SX(gx+grid,gy),      SY(gx+grid,gy));
+        ctx.lineTo(SX(gx+grid,gy+grid), SY(gx+grid,gy+grid));
+        ctx.lineTo(SX(gx,gy+grid),      SY(gx,gy+grid));
+        ctx.closePath(); ctx.fill();
+      }
+      // motas de arena / piedritas (solo Grecia)
+      if(!oly && h%7===0){
+        const rng = mulberry(h);
+        ctx.fillStyle = 'rgba(220,195,150,0.16)';
+        for(let s=0;s<4;s++){
+          const px = gx + rng()*grid, py = gy + rng()*grid;
+          ctx.fillRect(SX(px,py), SY(px,py), 2+rng()*2, 2);
+        }
+      }
+      // grietas (solo Grecia)
+      if(!oly && h%23===0){
+        ctx.strokeStyle='rgba(0,0,0,0.22)';
+        ctx.lineWidth=1.5;
+        ctx.beginPath();
+        ctx.moveTo(SX(gx+10,gy+10), SY(gx+10,gy+10));
+        ctx.lineTo(SX(gx+40,gy+30), SY(gx+40,gy+30));
+        ctx.lineTo(SX(gx+55,gy+62), SY(gx+55,gy+62));
+        ctx.stroke();
+      }
+    }
+  }
+  /* cuadrícula isométrica tenue */
+  ctx.strokeStyle = oly ? 'rgba(90,110,135,0.18)' : 'rgba(255,235,200,0.05)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for(let gx=x0; gx<=x1; gx+=grid){ ctx.moveTo(SX(gx,y0), SY(gx,y0)); ctx.lineTo(SX(gx,y1), SY(gx,y1)); }
+  for(let gy=y0; gy<=y1; gy+=grid){ ctx.moveTo(SX(x0,gy), SY(x0,gy)); ctx.lineTo(SX(x1,gy), SY(x1,gy)); }
+  ctx.stroke();
+
+  /* --- orbes de XP (rojos) --- */
+  for(const o of G.orbs){
+    const x = SX(o.wx,o.wy), y = SY(o.wx,o.wy) - 6 - Math.sin(o.t*5)*3;
+    ctx.fillStyle = o.val>1 ? '#ff5a3c' : '#d31f1f';
+    ctx.fillRect(x-4, y-4, 8, 8);
+    ctx.fillStyle = 'rgba(255,220,210,0.9)';
+    ctx.fillRect(x-1, y-1, 3, 3);
+  }
+
+  /* --- items desparramados: vida (verde) y Cuerno de Amaltea --- */
+  for(const it of G.items){
+    const gx = SX(it.wx,it.wy), gyb = SY(it.wx,it.wy);
+    const x = gx, y = gyb - 9 - Math.sin(it.t*4)*3;
+    ctx.fillStyle='rgba(0,0,0,0.3)';
+    ctx.beginPath(); ctx.ellipse(gx, gyb+2, 11, 4, 0, 0, Math.PI*2); ctx.fill();
+    if(it.kind==='heal'){
+      // bolita verde de vida con cruz
+      ctx.fillStyle='rgba(91,227,106,0.25)';
+      ctx.beginPath(); ctx.arc(x, y, 13, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#3ad13a';
+      ctx.beginPath(); ctx.arc(x, y, 7.5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#9bf08a';
+      ctx.beginPath(); ctx.arc(x-2, y-2, 2.6, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ffffff';
+      ctx.fillRect(x-1, y-4, 2, 8); ctx.fillRect(x-4, y-1, 8, 2);
+    } else {
+      // Cuerno de Amaltea (cornucopia dorada)
+      ctx.fillStyle='rgba(255,210,63,0.22)';
+      ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI*2); ctx.fill();
+      drawHorn(x, y);
+    }
+  }
+
+  /* --- partículas en el suelo --- */
+  for(const pa of G.particles){
+    ctx.globalAlpha = clamp(pa.life*2,0,1);
+    ctx.fillStyle = pa.color;
+    ctx.fillRect(SX(pa.wx,pa.wy), SY(pa.wx,pa.wy)-6, pa.size, pa.size);
+    ctx.globalAlpha = 1;
+  }
+
+  /* --- drawables con orden de profundidad --- */
+  const drawables = [];
+  for(const e of G.enemies) drawables.push({depth:e.wx+e.wy, kind:'enemy', e});
+  drawables.push({depth:p.wx+p.wy, kind:'player'});
+  if(G.wolf) drawables.push({depth:G.wolf.wx+G.wolf.wy, kind:'wolf'});
+  for(const b of G.birds) drawables.push({depth:b.wx+b.wy, kind:'bird', b});
+  for(const c of pillarsNear(p.wx, p.wy, RANGE)) drawables.push({depth:c.wx+c.wy, kind:'pillar', c});
+  if(G.realm==='grecia' && Math.abs(TEMPLE.wx-p.wx)<RANGE+400 && Math.abs(TEMPLE.wy-p.wy)<RANGE+400)
+    drawables.push({depth:TEMPLE.wx+TEMPLE.wy, kind:'temple'});
+  if(G.realm==='grecia' && Math.abs(STATUE.wx-p.wx)<RANGE+300 && Math.abs(STATUE.wy-p.wy)<RANGE+300)
+    drawables.push({depth:STATUE.wx+STATUE.wy, kind:'statue'});
+  for(const pr of G.projectiles) if(pr.type==='fenrir') drawables.push({depth:pr.wx+pr.wy, kind:'fenrir', pr});
+  drawables.sort((a,b)=> a.depth-b.depth);
+
+  for(const d of drawables){
+    if(d.kind==='pillar'){
+      if(d.c.statue) drawStatueSmall(SX(d.c.wx,d.c.wy), SY(d.c.wx,d.c.wy));
+      else drawColumn(SX(d.c.wx,d.c.wy), SY(d.c.wx,d.c.wy), d.c.h, d.c.broken, 1, d.c.marble);
+    }
+    else if(d.kind==='temple'){
+      drawTemple(SX(TEMPLE.wx,TEMPLE.wy), SY(TEMPLE.wx,TEMPLE.wy));
+    }
+    else if(d.kind==='statue'){
+      drawStatue(SX(STATUE.wx,STATUE.wy), SY(STATUE.wx,STATUE.wy));
+    }
+    else if(d.kind==='enemy'){
+      drawEnemy(d.e, SX, SY);
+    }
+    else if(d.kind==='player'){
+      const x = SX(p.wx,p.wy), y = SY(p.wx,p.wy);
+      ctx.fillStyle='rgba(0,0,0,0.4)';
+      ctx.beginPath(); ctx.ellipse(x, y+4, 22, 10, 0, 0, Math.PI*2); ctx.fill();
+      if(p.rageT>0){
+        ctx.fillStyle = `rgba(255,60,40,${0.12+Math.sin(G.time*16)*0.06})`;
+        ctx.beginPath(); ctx.arc(x, y-30, 78, 0, Math.PI*2); ctx.fill();
+      }
+      const c = CHARS[p.hero];
+      const spr = SPR[c.spr + '_' + (p.dir==='side'?'side':p.dir)];
+      const lungeOff = (p.lunge>0 ? 6 : 0) * (p.flip?-1:1);
+      drawActor(ctx, spr, x+ (p.dir==='side'?lungeOff:0), y, 4, p.dir==='side'&&p.flip, p.walkPhase, p.moving, c.leg, c.foot);
+      if(p.hitFlash>0){
+        ctx.fillStyle='rgba(255,60,60,0.35)';
+        ctx.fillRect(x-32, y-66, 64, 66);
+      }
+    }
+    else if(d.kind==='wolf'){
+      drawWolf(G.wolf, SX, SY, 1, 0.9);
+    }
+    else if(d.kind==='fenrir'){
+      const pr = d.pr;
+      drawWolfAt(SX(pr.wx,pr.wy), SY(pr.wx,pr.wy), pr.vx>=0?1:-1, pr.anim, 2.2, 0.85);
+      // estela
+      ctx.fillStyle='rgba(127,212,255,0.18)';
+      for(let s=1;s<=4;s++)
+        ctx.fillRect(SX(pr.wx,pr.wy)-pr.vx/640*s*22-20, SY(pr.wx,pr.wy)-pr.vy/640*s*11-30, 40-s*7, 24-s*4);
+    }
+    else if(d.kind==='bird'){
+      const b = d.b;
+      const x = SX(b.wx,b.wy), y = SY(b.wx,b.wy) - 38;
+      const flap = Math.sin(G.time*14 + b.ang*3) > 0 ? 1 : 0;
+      ctx.fillStyle = '#ffe27a';
+      ctx.fillRect(x-3, y-2, 6, 4);
+      ctx.fillRect(x-8, y-3-flap*2, 5, 3);
+      ctx.fillRect(x+3, y-3-flap*2, 5, 3);
+      ctx.fillStyle = '#9fe06c';
+      ctx.fillRect(x-1, y-4, 3, 2);
+      ctx.fillStyle = 'rgba(255,226,122,0.25)';
+      ctx.fillRect(x-2, y+3, 4, 6);
+    }
+  }
+
+  drawProjectiles(SX, SY);
+  drawEffects(SX, SY);
+
+  /* --- textos de daño --- */
+  ctx.font = 'bold 15px "Courier New", monospace';
+  ctx.textAlign='center';
+  for(const t of G.dmgTexts){
+    const x = SX(t.wx,t.wy), y = SY(t.wx,t.wy) - 60 - t.rise;
+    ctx.globalAlpha = clamp(t.life/0.7,0,1);
+    ctx.fillStyle = '#000';
+    ctx.fillText(t.txt, x+1, y+1);
+    ctx.fillStyle = t.color;
+    ctx.fillText(t.txt, x, y);
+    ctx.globalAlpha = 1;
+  }
+  ctx.textAlign='left';
+
+  /* viñeta + alerta de vida baja */
+  const vg = ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.35, W/2,H/2, Math.max(W,H)*0.75);
+  vg.addColorStop(0,'rgba(0,0,0,0)');
+  vg.addColorStop(1,'rgba(0,0,0,0.55)');
+  ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
+  if(p.hp < p.maxHp*0.3 && G.state==='playing'){
+    ctx.fillStyle = `rgba(160,20,20,${0.10+Math.sin(G.time*6)*0.05})`;
+    ctx.fillRect(0,0,W,H);
+  }
+}
+
+/* ---- dibujo de enemigos ---- */
+function drawEnemy(e, SX, SY){
+  const p = G.player;
+  const x = SX(e.wx,e.wy), y = SY(e.wx,e.wy);
+  const flip = SX(p.wx,p.wy) < x;
+  const scaleIn = e.spawnT>0 ? 1 - e.spawnT/0.3 : 1;
+
+  ctx.fillStyle='rgba(0,0,0,0.35)';
+  ctx.beginPath(); ctx.ellipse(x, y+4, e.r, e.r*0.45, 0, 0, Math.PI*2); ctx.fill();
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scaleIn, scaleIn);
+  ctx.translate(-x, -y);
+
+  if(e.T.custom==='eye'){
+    /* Pesadilla (Nightmare): ojo volador */
+    const fy = y - 34 - Math.sin(e.anim*1.4)*5;
+    const flap = Math.sin(e.anim*4)*4;
+    ctx.fillStyle='#3a2a4a';
+    ctx.fillRect(x-22, fy-4+flap, 12, 7);
+    ctx.fillRect(x+10, fy-4+flap, 12, 7);
+    ctx.fillStyle='#5a3a6e';
+    ctx.beginPath(); ctx.arc(x, fy, 13, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ff9c2e';
+    ctx.beginPath(); ctx.arc(x, fy, 7, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='#15161a';
+    ctx.beginPath(); ctx.arc(x + (flip?-2:2), fy, 3.4, 0, Math.PI*2); ctx.fill();
+  }
+  else if(e.T.custom==='zeus'){
+    /* Zeus: rey del Olimpo, túnica de mármol, corona dorada, rayos en la mano */
+    const sc = 1.5;
+    const bob = Math.sin(e.anim*0.8)*3;
+    const robe='#eef0ee', robeS='#c7cfd6', skin='#e7c9a0', gold='#ffd23f';
+    if(e.invuln){
+      // escudo divino mientras se cura (invulnerable)
+      ctx.strokeStyle = `rgba(127,212,255,${0.55+0.25*Math.sin(e.anim*6)})`;
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.ellipse(x, y-90*sc*0.7, 70, 120, 0, 0, Math.PI*2); ctx.stroke();
+      ctx.fillStyle = 'rgba(127,212,255,0.10)';
+      ctx.beginPath(); ctx.ellipse(x, y-90*sc*0.7, 70, 120, 0, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle=robeS; ctx.fillRect(x-22*sc, y-30*sc, 44*sc, 30*sc);          // base túnica
+    ctx.fillStyle=robe;  ctx.fillRect(x-26*sc, y-78*sc+bob, 52*sc, 50*sc);      // torso
+    ctx.fillStyle=robeS; ctx.fillRect(x-26*sc, y-78*sc+bob, 12*sc, 50*sc);
+    ctx.fillStyle=gold;  ctx.fillRect(x-26*sc, y-50*sc+bob, 52*sc, 5*sc);       // cinturón
+    ctx.fillStyle=skin;  ctx.fillRect(x-38*sc, y-72*sc+bob, 12*sc, 30*sc);      // brazo izq
+    const up = e.casting>0 ? 16*sc : 6*sc;
+    ctx.fillStyle=skin;  ctx.fillRect(x+26*sc, y-78*sc-up+bob, 12*sc, 30*sc);   // brazo der (levantado)
+    ctx.fillStyle=skin;  ctx.fillRect(x-14*sc, y-100*sc+bob, 28*sc, 22*sc);     // cabeza
+    ctx.fillStyle=robe;  ctx.fillRect(x-16*sc, y-104*sc+bob, 32*sc, 8*sc);      // pelo
+    ctx.fillStyle=gold;  for(let i=0;i<4;i++) ctx.fillRect(x-12*sc+i*8*sc, y-111*sc+bob, 4*sc, 8*sc); // corona
+    ctx.fillStyle=robe;  ctx.fillRect(x-12*sc, y-82*sc+bob, 24*sc, 15*sc);      // barba
+    ctx.fillStyle = e.casting>0 ? '#bff0ff' : '#ffe27a';
+    ctx.fillRect(x-8*sc, y-95*sc+bob, 5*sc, 4*sc);
+    ctx.fillRect(x+3*sc, y-95*sc+bob, 5*sc, 4*sc);
+    if(e.casting>0){
+      ctx.strokeStyle='rgba(191,240,255,0.95)'; ctx.lineWidth=2;
+      const hx = x+32*sc, hy = y-78*sc-up+bob;
+      for(let k=0;k<4;k++){ ctx.beginPath(); ctx.moveTo(hx,hy); ctx.lineTo(hx+rand(-14,14), hy-rand(8,24)); ctx.stroke(); }
+    }
+  }
+  else if(e.T.custom==='troll' || e.T.custom==='ciclope'){
+    /* Troll / Cíclope: gigantes */
+    const big = e.T.custom==='ciclope';
+    const sc = big ? 1.4 : 1;
+    const bodyC = big ? '#a8835c' : '#7a8694';
+    const darkC = big ? '#7a5e40' : '#5a636e';
+    const bob = Math.sin(e.anim*0.8)*3;
+    // piernas
+    ctx.fillStyle=darkC;
+    ctx.fillRect(x-26*sc, y-26*sc, 16*sc, 26*sc);
+    ctx.fillRect(x+10*sc, y-26*sc, 16*sc, 26*sc);
+    // torso
+    ctx.fillStyle=bodyC;
+    ctx.fillRect(x-34*sc, y-78*sc+bob, 68*sc, 54*sc);
+    ctx.fillStyle=darkC;
+    ctx.fillRect(x-34*sc, y-78*sc+bob, 14*sc, 54*sc);
+    // brazos
+    ctx.fillStyle=bodyC;
+    ctx.fillRect(x-48*sc, y-70*sc+bob, 14*sc, 44*sc);
+    ctx.fillRect(x+34*sc, y-70*sc+bob, 14*sc, 44*sc);
+    // garrote
+    ctx.fillStyle='#4a3520';
+    ctx.fillRect(x+(flip?-62:42)*sc, y-96*sc+bob, 12*sc, 56*sc);
+    // cabeza
+    ctx.fillStyle=bodyC;
+    ctx.fillRect(x-16*sc, y-100*sc+bob, 32*sc, 24*sc);
+    if(big){
+      // un solo ojo
+      ctx.fillStyle='#ffe27a';
+      ctx.beginPath(); ctx.arc(x, y-88*sc+bob, 7*sc, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle='#15161a';
+      ctx.beginPath(); ctx.arc(x+(flip?-2:2), y-88*sc+bob, 3*sc, 0, Math.PI*2); ctx.fill();
+      // boca
+      ctx.fillStyle='#3a2418';
+      ctx.fillRect(x-8*sc, y-80*sc+bob, 16*sc, 4*sc);
+    } else {
+      ctx.fillStyle='#ff9c2e';
+      ctx.fillRect(x-9*sc, y-92*sc+bob, 5*sc, 5*sc);
+      ctx.fillRect(x+4*sc,  y-92*sc+bob, 5*sc, 5*sc);
+    }
+  }
+  else if(e.T.custom==='alado'){
+    /* Alado: figura sagrada con alas que ataca de lejos con lanzas */
+    const fy = y - 30 - Math.sin(e.anim*2)*4;
+    const flap = Math.sin(e.anim*5)*7;
+    // alas
+    ctx.fillStyle = '#f2efe7';
+    ctx.beginPath();
+    ctx.moveTo(x-6, fy-6);
+    ctx.quadraticCurveTo(x-30, fy-18-flap, x-34, fy+6-flap*0.4);
+    ctx.quadraticCurveTo(x-22, fy+2, x-6, fy+6);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x+6, fy-6);
+    ctx.quadraticCurveTo(x+30, fy-18-flap, x+34, fy+6-flap*0.4);
+    ctx.quadraticCurveTo(x+22, fy+2, x+6, fy+6);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#cfd6dc';
+    ctx.fillRect(x-10, fy-4, 4, 10); ctx.fillRect(x+6, fy-4, 4, 10);
+    // túnica
+    ctx.fillStyle = '#eef0ee'; ctx.fillRect(x-8, fy-8, 16, 22);
+    ctx.fillStyle = '#c7cfd6'; ctx.fillRect(x-8, fy-8, 5, 22);
+    ctx.fillStyle = '#d4af37'; ctx.fillRect(x-8, fy+8, 16, 3);
+    // cabeza
+    ctx.fillStyle = '#e3c4a0'; ctx.fillRect(x-5, fy-20, 10, 11);
+    // halo
+    ctx.strokeStyle = '#ffe27a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(x, fy-23, 9, 4, 0, 0, Math.PI*2); ctx.stroke();
+    // ojos
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + (flip?-4:1), fy-16, 3, 3);
+    // lanza
+    ctx.strokeStyle = '#caa11f'; ctx.lineWidth = 2;
+    const sx2 = flip ? x-12 : x+12;
+    ctx.beginPath(); ctx.moveTo(sx2, fy-14); ctx.lineTo(sx2, fy+14); ctx.stroke();
+    ctx.fillStyle = '#dfe9f2';
+    ctx.beginPath(); ctx.moveTo(sx2-3, fy-14); ctx.lineTo(sx2+3, fy-14); ctx.lineTo(sx2, fy-21); ctx.closePath(); ctx.fill();
+  }
+  else {
+    /* humanoides con paleta intercambiada (incluye figuras sagradas con túnica) */
+    const sc = e.T.sc;
+    const spr = e.T.spr==='robed' ? SPR.robed : SPR_ENEMY;
+    drawActor(ctx, spr, x, y, sc, flip, e.anim, e.stun<=0, e.T.pal?(e.T.pal.M||'#4d4030'):'#4d4030', '#2a2218', e.T.pal);
+    if(e.T.snakes){
+      ctx.fillStyle='#54b14a';
+      for(let s=0;s<3;s++){
+        const off = Math.sin(e.anim*3 + s*2)*3;
+        ctx.fillRect(x-10+s*8+off, y-(12+4)*sc - 8, 4, 9);
+        ctx.fillStyle = s%2 ? '#7fe06c' : '#54b14a';
+      }
+    }
+    if(e.T.shield){
+      ctx.fillStyle='#7a5a2c';
+      ctx.fillRect(x+(flip?6:-22), y-9*sc-14, 16, 22);
+      ctx.fillStyle='#9a7438';
+      ctx.fillRect(x+(flip?10:-18), y-9*sc-9, 8, 12);
+    }
+    if(e.T.horns){
+      ctx.fillStyle='#ddd7c8';
+      ctx.fillRect(x-13*1.4, y-(12+4)*sc-6, 5, 9);
+      ctx.fillRect(x+8*1.4,  y-(12+4)*sc-6, 5, 9);
+    }
+    if(e.charging>0){
+      ctx.fillStyle='rgba(255,120,40,0.25)';
+      ctx.fillRect(x-14*sc, y-16*sc, 28*sc, 16*sc);
+    }
+  }
+  ctx.restore();
+
+  /* estados */
+  const topY = y - (e.T.custom==='zeus' ? 178 : (e.T.custom ? 100 : (12+4)*e.T.sc)) - 10;
+  if(e.slow>0){
+    ctx.fillStyle='rgba(127,212,255,0.30)';
+    ctx.fillRect(x-e.r, topY+6, e.r*2, y-topY);
+  }
+  if(e.stun>0){
+    ctx.fillStyle='#9cc27a';
+    for(let s=0;s<3;s++) ctx.fillRect(x-12+s*10, y-4, 4, 6);
+  }
+  if(e.hitFlash>0){
+    ctx.fillStyle='rgba(255,255,255,0.5)';
+    ctx.fillRect(x-e.r, topY+6, e.r*2, y-topY);
+  }
+  /* barra de vida */
+  if(e.hp < e.maxHp){
+    const w = e.T.boss ? 60 : 36;
+    ctx.fillStyle='#000'; ctx.fillRect(x-w/2, topY-4, w, 5);
+    ctx.fillStyle = e.invuln ? '#7fd4ff' : (e.T.boss ? '#ff5040' : (e.T.elite ? '#ffd23f' : '#d83a2e'));
+    ctx.fillRect(x-w/2+1, topY-3, (w-2)*clamp(e.hp/e.maxHp,0,1), 3);
+  }
+}
+
+/* ---- lobos ---- */
+function drawWolf(w, SX, SY, scale, alpha){
+  const x = SX(w.wx,w.wy), y = SY(w.wx,w.wy);
+  const flip = w.target ? (SX(w.target.wx,w.target.wy) < x) : false;
+  drawWolfAt(x, y, flip?-1:1, w.anim, scale, alpha);
+}
+function drawWolfAt(x, y, f, anim, scale, alpha){
+  const s = scale;
+  const bob = Math.sin(anim)*2*s;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle='rgba(127,212,255,0.18)';
+  ctx.beginPath(); ctx.ellipse(x, y+3, 20*s, 8*s, 0, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#bfe8ff';
+  ctx.fillRect(x-16*s, y-18*s+bob, 32*s, 12*s);
+  ctx.fillRect(x+f*14*s-6*s, y-26*s+bob, 14*s, 12*s);
+  ctx.fillRect(x+f*14*s-4*s, y-31*s+bob, 4*s, 5*s);
+  ctx.fillRect(x+f*14*s+2*s, y-31*s+bob, 4*s, 5*s);
+  const legSwing = Math.sin(anim*2)*2*s;
+  ctx.fillRect(x-14*s+legSwing, y-7*s+bob, 5*s, 8*s);
+  ctx.fillRect(x+9*s-legSwing,  y-7*s+bob, 5*s, 8*s);
+  ctx.fillRect(x-f*20*s-2*s, y-22*s+bob+Math.sin(anim*1.5)*2*s, 8*s, 5*s);
+  ctx.fillStyle = '#1f7fb8';
+  ctx.fillRect(x+f*16*s-2*s, y-23*s+bob, 3*s, 3*s);
+  ctx.restore();
+}
+
+/* ---- proyectiles ---- */
+function drawProjectiles(SX, SY){
+  const p = G.player;
+  for(const pr of G.projectiles){
+    const x = SX(pr.wx,pr.wy), y = SY(pr.wx,pr.wy)-24;
+    if(pr.type==='espear'){
+      // lanza del alado (sagrada, dorada)
+      const ang = Math.atan2(isoY(pr.wx+pr.vx,pr.wy+pr.vy)-isoY(pr.wx,pr.wy), isoX(pr.wx+pr.vx,pr.wy+pr.vy)-isoX(pr.wx,pr.wy));
+      ctx.save();
+      ctx.translate(x,y); ctx.rotate(ang);
+      ctx.fillStyle='rgba(255,226,122,0.35)'; ctx.fillRect(-16,-4,32,8);
+      ctx.fillStyle='#caa11f'; ctx.fillRect(-14,-2,24,4);
+      ctx.fillStyle='#dfe9f2';
+      ctx.beginPath(); ctx.moveTo(10,-5); ctx.lineTo(10,5); ctx.lineTo(20,0); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    else if(pr.type==='arrow' || pr.type==='parrow'){
+      const ang = Math.atan2(isoY(pr.wx+pr.vx,pr.wy+pr.vy)-isoY(pr.wx,pr.wy), isoX(pr.wx+pr.vx,pr.wy+pr.vy)-isoX(pr.wx,pr.wy));
+      ctx.save();
+      ctx.translate(x,y); ctx.rotate(ang);
+      ctx.fillStyle='#8a5a2b'; ctx.fillRect(-12,-2,22,4);
+      ctx.fillStyle = pr.burn ? '#ff8a2e' : '#cfd6dd';
+      ctx.fillRect(10,-3,7,6);
+      ctx.fillStyle = pr.col || '#9fe06c';
+      ctx.fillRect(-15,-4,5,8);
+      if(pr.burn){
+        ctx.fillStyle='rgba(255,138,46,0.5)';
+        ctx.fillRect(-6,-5,8,10);
+      }
+      ctx.restore();
+    }
+    else if(pr.type==='feather'){
+      const ang = Math.atan2(pr.vy*0.5, pr.vx);
+      ctx.save();
+      ctx.translate(x,y); ctx.rotate(ang);
+      ctx.fillStyle='#d9f2e8'; ctx.fillRect(-8,-2,16,4);
+      ctx.fillStyle='#8fc9b2'; ctx.fillRect(-8,-2,16,2);
+      ctx.restore();
+    }
+    else if(pr.type==='bolt'){
+      ctx.fillStyle='rgba(143,232,154,0.3)';
+      ctx.beginPath(); ctx.arc(x,y,12,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#8fe89a';
+      ctx.fillRect(x-5,y-5,10,10);
+      ctx.fillStyle='#e8ffe0';
+      ctx.fillRect(x-2,y-2,4,4);
+    }
+    else if(pr.type==='soul'){
+      const fl = Math.sin(pr.t*12)*2;
+      ctx.fillStyle='rgba(184,138,255,0.3)';
+      ctx.beginPath(); ctx.arc(x,y,14,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#b88aff';
+      ctx.fillRect(x-5,y-7+fl,10,12);
+      ctx.fillStyle='#15161a';
+      ctx.fillRect(x-3,y-4+fl,2,3);
+      ctx.fillRect(x+1,y-4+fl,2,3);
+    }
+    else if(pr.type==='axe'){
+      const sc = p.areaMul;
+      ctx.save();
+      ctx.translate(x,y); ctx.rotate(pr.spin); ctx.scale(sc,sc);
+      ctx.fillStyle='rgba(127,212,255,0.25)';
+      ctx.beginPath(); ctx.arc(0,0,26,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#6b4a2f'; ctx.fillRect(-4,-26,8,48);
+      ctx.fillStyle='#cfd6dd'; ctx.fillRect(-20,-26,24,14);
+      ctx.fillStyle='#7fd4ff'; ctx.fillRect(-20,-26,24,4);
+      ctx.restore();
+    }
+  }
+}
+
+/* ---- efectos ---- */
+function drawEffects(SX, SY){
+  const p = G.player;
+  for(const fx of G.effects){
+    const px = SX(p.wx,p.wy), py = SY(p.wx,p.wy)-20;
+    const gy = SY(p.wx,p.wy);
+    const prog = 1 - fx.life/fx.max;
+
+    if(fx.type==='punch'){
+      const r = 30 + prog*35;
+      ctx.strokeStyle = `rgba(255,255,255,${1-prog})`;
+      ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(px, py, r, fx.ang-0.6, fx.ang+0.6); ctx.stroke();
+    }
+    else if(fx.type==='axeswing'){
+      const r = 70 + prog*60*p.areaMul;
+      ctx.strokeStyle = `rgba(207,230,255,${1-prog})`;
+      ctx.lineWidth = 10;
+      ctx.beginPath(); ctx.arc(px, py, r, fx.ang-0.9+prog*1.2, fx.ang+0.3+prog*1.2); ctx.stroke();
+    }
+    else if(fx.type==='spin'){
+      const r = 95*p.areaMul;
+      ctx.strokeStyle = `rgba(255,177,74,${1-prog})`;
+      ctx.lineWidth = 8;
+      const a0 = prog*Math.PI*2.5;
+      ctx.beginPath(); ctx.ellipse(px, py, r, r*0.5, 0, a0, a0+2.2); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,100,30,${(1-prog)*0.7})`;
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.ellipse(px, py, r*0.7, r*0.35, 0, a0+1, a0+3); ctx.stroke();
+    }
+    else if(fx.type==='slash'){
+      const r = 110*p.areaMul;
+      ctx.strokeStyle = `rgba(191,232,255,${1-prog})`;
+      ctx.lineWidth = 9;
+      ctx.beginPath(); ctx.arc(px, py, r*(0.5+prog*0.5), fx.ang-0.8, fx.ang+0.8); ctx.stroke();
+    }
+    else if(fx.type==='blades'){
+      const R = fx.R || 0;
+      const base = prog*Math.PI*2.4;
+      for(let k=0;k<2;k++){
+        const a0 = base + k*Math.PI;
+        ctx.strokeStyle = `rgba(255,120,30,${0.9*Math.sin(prog*Math.PI)})`;
+        ctx.lineWidth = 7;
+        ctx.beginPath(); ctx.ellipse(px, py, R, R*0.5, 0, a0, a0+1.6); ctx.stroke();
+        ctx.fillStyle = `rgba(255,200,90,${Math.sin(prog*Math.PI)})`;
+        for(let s=0;s<6;s++){
+          const a = a0 + s*0.28;
+          ctx.fillRect(px+Math.cos(a)*R-3, py+Math.sin(a)*R*0.5-3, 6, 6);
+        }
+        const tip = a0+1.6;
+        ctx.fillStyle = `rgba(255,80,20,${Math.sin(prog*Math.PI)})`;
+        ctx.fillRect(px+Math.cos(tip)*R-6, py+Math.sin(tip)*R*0.5-10, 12, 20);
+      }
+    }
+    else if(fx.type==='frost' || fx.type==='nova'){
+      const R = fx.R || 0;
+      const col = fx.type==='frost' ? '127,212,255' : '255,210,63';
+      ctx.strokeStyle = `rgba(${col},${1-prog})`;
+      ctx.lineWidth = 14*(1-prog)+3;
+      ctx.beginPath(); ctx.ellipse(px, gy, R, R*0.5, 0, 0, Math.PI*2); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,255,255,${(1-prog)*0.5})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(px, gy, R*0.8, R*0.4, 0, 0, Math.PI*2); ctx.stroke();
+      ctx.fillStyle = `rgba(${col},${1-prog})`;
+      for(let s=0;s<10;s++){
+        const a = s/10*Math.PI*2 + prog*1.5;
+        ctx.fillRect(px+Math.cos(a)*R-2, gy+Math.sin(a)*R*0.5-6, 4, 10);
+      }
+    }
+    else if(fx.type==='shieldwave'){
+      const R = prog * 170 * p.areaMul;
+      ctx.strokeStyle = fx.color || '#cfd6dd';
+      ctx.globalAlpha = 1-prog;
+      ctx.lineWidth = 8*(1-prog)+2;
+      ctx.beginPath(); ctx.ellipse(px, gy, R, R*0.5, 0, 0, Math.PI*2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    else if(fx.type==='roots'){
+      const R = 170*p.areaMul;
+      ctx.strokeStyle = `rgba(124,179,90,${Math.sin(prog*Math.PI)})`;
+      ctx.lineWidth = 4;
+      for(let s=0;s<8;s++){
+        const a = s/8*Math.PI*2;
+        const ex = px + Math.cos(a)*R*Math.min(prog*2,1);
+        const ey = gy + Math.sin(a)*R*0.5*Math.min(prog*2,1);
+        ctx.beginPath();
+        ctx.moveTo(px, gy);
+        ctx.quadraticCurveTo(px+Math.cos(a+0.4)*R*0.5, gy+Math.sin(a+0.4)*R*0.25 - 14, ex, ey);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(124,179,90,${Math.sin(prog*Math.PI)})`;
+        ctx.fillRect(ex-3, ey-9, 5, 9);
+      }
+    }
+    else if(fx.type==='rain'){
+      const x = SX(fx.wx,fx.wy), y = SY(fx.wx,fx.wy);
+      ctx.strokeStyle = 'rgba(159,224,108,0.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(x, y, fx.R, fx.R*0.5, 0, 0, Math.PI*2); ctx.stroke();
+    }
+    else if(fx.type==='impact'){
+      const x = SX(fx.wx,fx.wy), y = SY(fx.wx,fx.wy);
+      // flecha cayendo
+      ctx.strokeStyle = `rgba(159,224,108,${1-prog})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x+18, y-70+prog*60);
+      ctx.lineTo(x, y-prog*4);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(255,255,255,${1-prog})`;
+      ctx.beginPath(); ctx.arc(x, y-4, 6*(1-prog)+2, 0, Math.PI*2); ctx.fill();
+    }
+    else if(fx.type==='lightning'){
+      const x = SX(fx.wx,fx.wy), y = SY(fx.wx,fx.wy);
+      ctx.strokeStyle = fx.col || '#8fe89a';
+      ctx.globalAlpha = 1-prog;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      let yy = y-160;
+      ctx.moveTo(x+rand(-6,6), yy);
+      while(yy < y-10){
+        yy += 26;
+        ctx.lineTo(x+rand(-12,12), yy);
+      }
+      ctx.lineTo(x, y-6);
+      ctx.stroke();
+      ctx.fillStyle = fx.col || '#8fe89a';
+      ctx.beginPath(); ctx.arc(x, y-6, 10*(1-prog), 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    else if(fx.type==='chain'){
+      ctx.strokeStyle = `rgba(127,212,255,${1-prog})`;
+      ctx.lineWidth = 4;
+      for(const seg of fx.segs){
+        const ax = SX(seg.a.wx,seg.a.wy), ay = SY(seg.a.wx,seg.a.wy)-26;
+        const bx = SX(seg.b.wx,seg.b.wy), by = SY(seg.b.wx,seg.b.wy)-26;
+        ctx.beginPath();
+        ctx.moveTo(ax,ay);
+        const mx = (ax+bx)/2 + rand(-8,8), my = (ay+by)/2 + rand(-8,8);
+        ctx.lineTo(mx,my);
+        ctx.lineTo(bx,by);
+        ctx.stroke();
+      }
+    }
+    else if(fx.type==='ragepulse'){
+      const R = prog*120;
+      ctx.strokeStyle = `rgba(255,60,40,${1-prog})`;
+      ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.ellipse(px, gy, R, R*0.5, 0, 0, Math.PI*2); ctx.stroke();
+    }
+    else if(fx.type==='soulburst'){
+      const x = SX(fx.wx,fx.wy), y = SY(fx.wx,fx.wy)-20;
+      ctx.strokeStyle = `rgba(184,138,255,${1-prog})`;
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(x, y, prog*60, 0, Math.PI*2); ctx.stroke();
+    }
+    else if(fx.type==='puff'){
+      const x = SX(fx.wx,fx.wy), y = SY(fx.wx,fx.wy)-20;
+      ctx.fillStyle = `rgba(122,32,48,${(1-prog)*0.5})`;
+      for(let s=0;s<5;s++){
+        const a = s/5*Math.PI*2;
+        ctx.fillRect(x+Math.cos(a)*prog*26-3, y+Math.sin(a)*prog*16-3, 6, 6);
+      }
+    }
+    else if(fx.type==='snort'){
+      const x = SX(fx.wx,fx.wy), y = SY(fx.wx,fx.wy)-30;
+      ctx.fillStyle = `rgba(255,120,40,${1-prog})`;
+      ctx.fillRect(x-10, y-4, 6, 4);
+      ctx.fillRect(x+5,  y-4, 6, 4);
+    }
+    else if(fx.type==='bite'){
+      const x = SX(fx.wx,fx.wy), y = SY(fx.wx,fx.wy)-26;
+      ctx.strokeStyle = `rgba(191,232,255,${1-prog})`;
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(x,y,12+prog*10,0,Math.PI*2); ctx.stroke();
+    }
+    else if(fx.type==='zeuswarn'){
+      // marca de caída del rayo: círculo rojo que se llena (hay que salir de ahí)
+      const x = SX(fx.wx,fx.wy), y = SY(fx.wx,fx.wy);
+      const R = fx.R;
+      ctx.strokeStyle = `rgba(255,80,60,${0.55+0.45*Math.sin(prog*22)})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(x, y, R, R*0.5, 0, 0, Math.PI*2); ctx.stroke();
+      ctx.fillStyle = `rgba(191,240,255,${0.06+prog*0.28})`;
+      ctx.beginPath(); ctx.ellipse(x, y, R*prog, R*0.5*prog, 0, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fillRect(x-1, y-8, 2, 16); ctx.fillRect(x-8, y-1, 16, 2);
+    }
+    else if(fx.type==='zeusbolt'){
+      // el rayo cae
+      const x = SX(fx.wx,fx.wy), y = SY(fx.wx,fx.wy);
+      ctx.strokeStyle = `rgba(255,255,255,${1-prog})`;
+      ctx.lineWidth = 6*(1-prog)+2;
+      ctx.beginPath();
+      let yy = y-280; ctx.moveTo(x+rand(-8,8), yy);
+      while(yy < y-8){ yy += 34; ctx.lineTo(x+rand(-16,16), yy); }
+      ctx.lineTo(x, y-4); ctx.stroke();
+      ctx.fillStyle = `rgba(191,240,255,${(1-prog)*0.8})`;
+      const r = 60*(1-prog)+12;
+      ctx.beginPath(); ctx.ellipse(x, y, r, r*0.5, 0, 0, Math.PI*2); ctx.fill();
+    }
+  }
+}
+
+/* =========================================================
+   GAME LOOP (60 FPS)
+   ========================================================= */
+let last = performance.now();
+function loop(now){
+  const dt = Math.min((now-last)/1000, 0.05);
+  last = now;
+  if(G.state==='playing') update(dt);
+  if(G.state!=='menu') render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
