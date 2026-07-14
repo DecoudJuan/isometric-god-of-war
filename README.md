@@ -111,3 +111,8 @@ O publicalo con **GitHub Pages**: en el repo, `Settings → Pages → Source: ma
 ---
 
 *Proyecto fan sin fines de lucro. God of War es propiedad de Santa Monica Studio / Sony Interactive Entertainment.*
+
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
